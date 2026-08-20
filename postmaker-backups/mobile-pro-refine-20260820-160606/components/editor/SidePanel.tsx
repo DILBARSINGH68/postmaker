@@ -838,17 +838,6 @@ export default function SidePanel(
     );
   };
 
-  const closeAfterInsertOnMobile = () => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      props.onClose();
-    }
-  };
-
-  const insertAndClose = (action: () => void) => {
-    action();
-    closeAfterInsertOnMobile();
-  };
-
   const useTemplate = (
     type: TemplateType
   ) => {
@@ -874,7 +863,6 @@ export default function SidePanel(
     );
 
     props.onTemplate(type);
-    closeAfterInsertOnMobile();
   };
 
   const filteredElements = useMemo(() => {
@@ -900,14 +888,13 @@ export default function SidePanel(
 
   return (
     <aside
-      className="fixed inset-x-0 bottom-[calc(58px_+_env(safe-area-inset-bottom))] z-40 flex h-[46dvh] min-h-[260px] max-h-[440px] flex-col overflow-hidden rounded-t-[24px] border-t bg-white shadow-[0_-14px_35px_rgba(15,23,42,0.16)] md:static md:z-auto md:h-full md:min-h-0 md:max-h-none md:w-[280px] md:shrink-0 md:rounded-none md:border-r md:border-t-0 md:shadow-none"
+      className="fixed inset-x-0 bottom-[calc(64px_+_env(safe-area-inset-bottom))] z-40 flex max-h-[calc(100dvh_-_126px_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden rounded-t-2xl border-t bg-white shadow-2xl md:static md:z-auto md:h-full md:max-h-none md:w-[300px] md:shrink-0 md:rounded-none md:border-r md:border-t-0 md:shadow-none"
       style={{
-        flex: "0 0 280px",
+        flex: "0 0 300px",
       }}
     >
-      <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-300 md:hidden" />
-      <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-3 py-2">
-        <h2 className="text-[12px] font-semibold capitalize tracking-[-0.01em]">
+      <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-3 py-2.5">
+        <h2 className="text-[13px] font-semibold capitalize">
           {props.activePanel ===
           "imageEdit"
             ? "Edit image"
@@ -928,7 +915,7 @@ export default function SidePanel(
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-5 text-[12px]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-5">
         {(props.activePanel ===
           "templates" ||
           props.activePanel ===
@@ -1130,7 +1117,7 @@ export default function SidePanel(
             "frameEdit") && (
           <SmartFramePanel
             selected={props.selected}
-            onAddFrame={(id) => insertAndClose(() => props.onAddSmartFrame(id))}
+            onAddFrame={props.onAddSmartFrame}
             onFrameImageUpload={props.onFrameImageUpload}
             onFrameFit={props.onFrameFit}
             onFrameZoom={props.onFrameZoom}
@@ -1146,7 +1133,9 @@ export default function SidePanel(
           "text" && (
           <div className="space-y-3">
             <button
-              onClick={() => insertAndClose(props.onAddHeading)}
+              onClick={
+                props.onAddHeading
+              }
               className="w-full rounded-xl border p-4 text-left hover:bg-gray-50"
             >
               <div className="text-xl font-bold">
@@ -1155,7 +1144,9 @@ export default function SidePanel(
             </button>
 
             <button
-              onClick={() => insertAndClose(props.onAddSubtitle)}
+              onClick={
+                props.onAddSubtitle
+              }
               className="w-full rounded-xl border p-4 text-left hover:bg-gray-50"
             >
               <div className="font-semibold">
@@ -1164,7 +1155,7 @@ export default function SidePanel(
             </button>
 
             <button
-              onClick={() => insertAndClose(props.onAddBody)}
+              onClick={props.onAddBody}
               className="w-full rounded-xl border p-4 text-left hover:bg-gray-50"
             >
               <div className="text-sm">
@@ -1192,10 +1183,9 @@ export default function SidePanel(
             <input
               type="file"
               accept="image/*"
-              onChange={(event) => {
-                props.onImageUpload(event);
-                closeAfterInsertOnMobile();
-              }}
+              onChange={
+                props.onImageUpload
+              }
               className="hidden"
             />
           </label>
@@ -1255,7 +1245,7 @@ export default function SidePanel(
                 {filteredElements.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => insertAndClose(() => props.onAddElement(item.id))}
+                    onClick={() => props.onAddElement(item.id)}
                     className="group min-h-[92px] rounded-xl border bg-white p-2 text-center transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md"
                     title={item.name}
                   >
@@ -1280,7 +1270,7 @@ export default function SidePanel(
           "mockups" && (
           <MockupsPanel
             selected={props.selected}
-            onAddMockup={(id) => insertAndClose(() => props.onAddMockup(id))}
+            onAddMockup={props.onAddMockup}
             onMockupImageUpload={props.onMockupImageUpload}
             onMockupFit={props.onMockupFit}
             onMockupZoom={props.onMockupZoom}
@@ -1299,12 +1289,12 @@ export default function SidePanel(
             selected={props.selected}
             onChange={props.onBrandKitChange}
             onLogoUpload={props.onBrandLogoUpload}
-            onAddLogo={(logo) => insertAndClose(() => props.onAddBrandLogo(logo))}
+            onAddLogo={props.onAddBrandLogo}
             onRemoveLogo={props.onRemoveBrandLogo}
             onApplyToDesign={props.onApplyBrandToDesign}
             onApplyColorToSelected={props.onApplyBrandColorToSelected}
-            onAddBrandHeading={() => insertAndClose(props.onAddBrandHeading)}
-            onAddBrandBody={() => insertAndClose(props.onAddBrandBody)}
+            onAddBrandHeading={props.onAddBrandHeading}
+            onAddBrandBody={props.onAddBrandBody}
           />
         )}
 
@@ -1315,7 +1305,7 @@ export default function SidePanel(
             theme={props.resumeTheme}
             onChange={props.onResumeDataChange}
             onThemeChange={props.onResumeThemeChange}
-            onBuild={() => insertAndClose(props.onBuildResume)}
+            onBuild={props.onBuildResume}
             onReset={props.onResetResume}
           />
         )}

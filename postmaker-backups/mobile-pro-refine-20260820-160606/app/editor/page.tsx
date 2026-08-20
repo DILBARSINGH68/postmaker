@@ -822,7 +822,7 @@ export default function EditorPage() {
       ).then((didSave) => {
         setSaved(didSave);
       });
-    }, 500);
+    }, 700);
 
     return () => clearTimeout(timer);
   }, [selected, background, format, objects, projectName, activePageIndex, pages.length]);
@@ -855,9 +855,6 @@ export default function EditorPage() {
     const updateSelection = () => {
       const obj = c.getActiveObject();
       setSelected(snapshotObject(obj));
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
-        setActivePanel(null);
-      }
       refreshObjects();
     };
 
@@ -1067,7 +1064,6 @@ export default function EditorPage() {
     c.on("selection:updated", updateSelection);
     c.on("selection:cleared", clearSelection);
     c.on("object:modified", modified);
-    c.on("text:changed", modified);
     c.on("object:added", refreshObjects);
     c.on("object:removed", refreshObjects);
     c.on("mouse:down", cropMouseDown);
@@ -3443,7 +3439,7 @@ export default function EditorPage() {
       lines.length > 0 &&
       lines.every((line) =>
         line.trimStart().startsWith(
-          "â€¢ "
+          "• "
         )
       );
 
@@ -3451,14 +3447,14 @@ export default function EditorPage() {
       ? lines
           .map((line) =>
             line.replace(
-              /^\s*â€¢\s*/,
+              /^\s*•\s*/,
               ""
             )
           )
           .join("\n")
       : lines
           .map(
-            (line) => `â€¢ ${line}`
+            (line) => `• ${line}`
           )
           .join("\n");
 
@@ -3479,7 +3475,7 @@ export default function EditorPage() {
     name: string
   ) => {
     window.alert(
-      `${name} AI/backend feature hai. Static â‚¹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
+      `${name} AI/backend feature hai. Static ₹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
     );
   };
 
@@ -3941,8 +3937,8 @@ export default function EditorPage() {
       [
         `Type: ${String(obj.type || "object")}`,
         `Position: ${Math.round(box.left)}, ${Math.round(box.top)}`,
-        `Size: ${Math.round(box.width)} Ã— ${Math.round(box.height)}`,
-        `Rotation: ${Math.round(obj.angle || 0)}Â°`,
+        `Size: ${Math.round(box.width)} × ${Math.round(box.height)}`,
+        `Rotation: ${Math.round(obj.angle || 0)}°`,
         `Opacity: ${Math.round((obj.opacity ?? 1) * 100)}%`,
       ].join("\n")
     );
@@ -4306,7 +4302,7 @@ export default function EditorPage() {
       const widthZoom = (availableWidth / Math.max(1, size.width)) * 100;
       const heightZoom = (availableHeight / Math.max(1, size.height)) * 100;
 
-      return Math.max(16, Math.min(52, Math.floor(Math.min(widthZoom, heightZoom))));
+      return Math.max(18, Math.min(72, Math.floor(Math.min(widthZoom, heightZoom))));
     }
 
     const maxSide = Math.max(size.width, size.height);
@@ -5367,7 +5363,7 @@ export default function EditorPage() {
 
           {cropMode && (
             <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
-              Crop mode Â· image drag karo Â· ratio choose karo Â· Done
+              Crop mode · image drag karo · ratio choose karo · Done
             </div>
           )}
 
