@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import HomeSidebar from "@/components/home/HomeSidebar";
-import AuthRecentProjects from "@/components/auth/AuthRecentProjects";
-import AuthButton from "@/components/auth/AuthButton";
+import RecentProjects from "@/components/home/RecentProjects";
 import MobileBottomNav from "@/components/home/MobileBottomNav";
 
 import {
@@ -48,7 +47,6 @@ export default function Home() {
               </div>
 
               <div className="ml-auto flex items-center gap-2">
-                <AuthButton />
                 <Link
                   href="/editor?new=1"
                   className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-violet-100 backdrop-blur hover:bg-white"
@@ -57,7 +55,7 @@ export default function Home() {
                 </Link>
 
                 <div className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-200">
-                  Free â€¢ No watermark
+                  Free • No watermark
                 </div>
               </div>
             </div>
@@ -77,7 +75,7 @@ export default function Home() {
               </p>
 
               <div className="mx-auto mt-7 flex max-w-3xl items-center gap-3 rounded-2xl border border-violet-300 bg-white px-4 py-4 shadow-xl shadow-violet-100/70">
-                <span className="text-xl text-slate-400">âŒ•</span>
+                <span className="text-xl text-slate-400">⌕</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -128,7 +126,7 @@ export default function Home() {
               </div>
 
               <a href="#templates" className="text-sm font-semibold text-violet-600">
-                See templates â†’
+                See templates →
               </a>
             </div>
 
@@ -165,7 +163,7 @@ export default function Home() {
                     </p>
 
                     <div className="mt-5 text-sm font-semibold">
-                      Start creating â†’
+                      Start creating →
                     </div>
                   </div>
                 </Link>
@@ -357,11 +355,11 @@ export default function Home() {
               </div>
 
               <Link href="/editor" className="text-sm font-semibold text-violet-600">
-                Open projects â†’
+                Open projects →
               </Link>
             </div>
 
-            <AuthRecentProjects />
+            <RecentProjects />
           </section>
 
           <section className="mt-14 overflow-hidden rounded-[32px] bg-slate-950 p-7 text-white md:p-10">
@@ -377,7 +375,7 @@ export default function Home() {
 
                 <p className="mt-4 max-w-xl text-sm leading-6 text-slate-400">
                   A focused design app for social media creators, small businesses,
-                  students and job seekers â€” without the clutter.
+                  students and job seekers — without the clutter.
                 </p>
 
                 <Link
@@ -392,7 +390,7 @@ export default function Home() {
                 {[
                   ["100+", "Social templates"],
                   ["50+", "Resume templates"],
-                  ["0â‚¹", "Core editor"],
+                  ["0₹", "Core editor"],
                   ["No", "Watermark"],
                 ].map(([value, label]) => (
                   <div

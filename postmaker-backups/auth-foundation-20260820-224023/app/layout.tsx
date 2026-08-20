@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PostMaker â€” Social Posts & Resume Maker",
+  title: "PostMaker — Social Posts & Resume Maker",
   description:
     "Create social media graphics, thumbnails and editable professional resumes with PostMaker.",
 };
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body><AuthProvider>{children}</AuthProvider></body>
+      <body>{children}</body>
     </html>
   );
 }

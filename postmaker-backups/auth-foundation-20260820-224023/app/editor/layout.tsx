@@ -1,6 +1,5 @@
 import type { Viewport } from "next";
 import type { ReactNode } from "react";
-import EditorAuthGate from "@/components/auth/EditorAuthGate";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -9,5 +8,5 @@ export const viewport: Viewport = {
 };
 
 export default function EditorLayout({ children }: { children: ReactNode }) {
-  return <EditorAuthGate>{children}</EditorAuthGate>;
+  return children;
 }
