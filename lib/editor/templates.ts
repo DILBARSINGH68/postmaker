@@ -9,6 +9,7 @@ import {
 
 import type { Format } from "@/types/editor";
 import { FESTIVALS } from "@/lib/editor/festivals";
+import { getSocialTemplateImage } from "@/lib/editor/templateImages";
 
 export type TemplateType = string;
 
@@ -284,6 +285,7 @@ const SOCIAL_DEFINITIONS: TemplateDefinition[] =
             eyebrow:
               category.eyebrow,
             cta: category.cta,
+            image: getSocialTemplateImage(category.slug),
           };
         }
       )
@@ -333,6 +335,7 @@ const EXTRA_SOCIAL_DEFINITIONS: TemplateDefinition[] =
         subline: category.subline,
         eyebrow: category.eyebrow,
         cta: category.cta,
+        image: getSocialTemplateImage(category.slug),
       };
     })
   );
@@ -657,9 +660,134 @@ function addBullets(
   );
 }
 
+function addTemplateImageToSlot(
+  canvas: Canvas,
+  imageUrl: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  accent: string,
+  renderToken: string
+) {
+  canvas.add(
+    new Rect({
+      left: x - Math.max(2, width * 0.012),
+      top: y - Math.max(2, height * 0.012),
+      width: width + Math.max(4, width * 0.024),
+      height: height + Math.max(4, height * 0.024),
+      rx: Math.max(8, Math.min(width, height) * 0.06),
+      ry: Math.max(8, Math.min(width, height) * 0.06),
+      fill: "rgba(255,255,255,0.18)",
+      stroke: accent,
+      strokeWidth: Math.max(2, Math.min(width, height) * 0.012),
+      selectable: false,
+      evented: false,
+    })
+  );
+
+  void FabricImage.fromURL(
+    imageUrl,
+    { crossOrigin: "anonymous" } as any
+  )
+    .then((image) => {
+      if ((canvas as any).__postMakerTemplateToken !== renderToken) return;
+
+      const sourceW = Math.max(1, Number(image.width || 1));
+      const sourceH = Math.max(1, Number(image.height || 1));
+      const targetRatio = width / Math.max(1, height);
+      const sourceRatio = sourceW / sourceH;
+
+      let cropX = 0;
+      let cropY = 0;
+      let cropW = sourceW;
+      let cropH = sourceH;
+
+      if (sourceRatio > targetRatio) {
+        cropW = sourceH * targetRatio;
+        cropX = (sourceW - cropW) / 2;
+      } else {
+        cropH = sourceW / targetRatio;
+        cropY = (sourceH - cropH) / 2;
+      }
+
+      image.set({
+        left: x,
+        top: y,
+        width: cropW,
+        height: cropH,
+        cropX,
+        cropY,
+        scaleX: width / cropW,
+        scaleY: height / cropH,
+        opacity: 1,
+      });
+
+      (image as any).templateImage = true;
+      (image as any).templateImageUrl = imageUrl;
+      image.setCoords();
+      canvas.add(image);
+      canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: image } as any);
+    })
+    .catch(() => {
+      // Keep the editable layout usable if a remote stock photo is unavailable.
+    });
+}
+
+function queueSocialTemplateImage(
+  canvas: Canvas,
+  item: TemplateDefinition,
+  renderToken: string,
+  ratio: number,
+  layout: number
+) {
+  if (!item.image) return;
+
+  const w = canvas.getWidth();
+  const h = canvas.getHeight();
+  const pad = Math.min(w, h) * 0.065;
+  let slot: [number, number, number, number];
+
+  if (ratio > 1.28) {
+    slot =
+      layout === 0
+        ? [w * 0.657, h * 0.105, w * 0.276, h * 0.79]
+        : layout === 1
+        ? [w * 0.73, h * 0.14, w * 0.19, h * 0.64]
+        : [w * 0.755, h * 0.14, w * 0.13, h * 0.72];
+  } else if (ratio < 0.82) {
+    slot =
+      layout === 0
+        ? [pad * 1.08, h * 0.07, w - pad * 2.16, h * 0.41]
+        : layout === 1
+        ? [w * 0.61, h * 0.68, w * 0.28, h * 0.17]
+        : [w * 0.61, h * 0.70, w * 0.25, h * 0.16];
+  } else {
+    slot =
+      layout === 0
+        ? [w * 0.73, h * 0.08, w * 0.19, h * 0.25]
+        : layout === 1
+        ? [w * 0.08, h * 0.68, w * 0.20, h * 0.16]
+        : [pad * 1.08, h * 0.10, w * 0.35, h * 0.40];
+  }
+
+  addTemplateImageToSlot(
+    canvas,
+    item.image,
+    slot[0],
+    slot[1],
+    slot[2],
+    slot[3],
+    item.accent,
+    renderToken
+  );
+}
+
 function socialTemplate(
   canvas: Canvas,
-  item: TemplateDefinition
+  item: TemplateDefinition,
+  renderToken: string
 ) {
   const w = canvas.getWidth();
   const h = canvas.getHeight();
@@ -1350,6 +1478,7 @@ function socialTemplate(
     }
   }
 
+  queueSocialTemplateImage(canvas, item, renderToken, ratio, layout);
   canvas.discardActiveObject();
   canvas.requestRenderAll();
 }
@@ -3325,7 +3454,8 @@ export function applyTemplate(
   } else {
     socialTemplate(
       canvas,
-      item
+      item,
+      renderToken
     );
   }
 }

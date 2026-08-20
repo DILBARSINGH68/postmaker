@@ -137,6 +137,15 @@ export default function Home() {
                   href={item.href}
                   className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${item.tone} p-6 text-white shadow-lg transition hover:-translate-y-1 hover:shadow-2xl`}
                 >
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${item.tone} opacity-80`} />
                   <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full border-[24px] border-white/10" />
                   <div className="absolute bottom-4 right-5 h-20 w-20 rotate-12 rounded-2xl bg-white/15" />
 
@@ -172,7 +181,7 @@ export default function Home() {
                   Social post templates
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  108 editable social templates are included in this starter library.
+                  162 editable social templates are included across major social formats.
                 </p>
               </div>
 
@@ -192,9 +201,18 @@ export default function Home() {
                   className="group"
                 >
                   <div
-                    className={`aspect-square overflow-hidden rounded-2xl bg-gradient-to-br ${item.tone} p-4 shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-xl`}
+                    className={`relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br ${item.tone} p-4 shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-xl`}
                   >
-                    <div className="flex h-full flex-col justify-between rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${item.tone} opacity-55`} />
+                    <div className="relative flex h-full flex-col justify-between rounded-xl border border-white/30 bg-black/10 p-3 backdrop-blur-[1px]">
                       <div className="h-2 w-12 rounded-full bg-white/70" />
                       <div>
                         <div className="text-lg font-black text-white">
@@ -273,7 +291,7 @@ export default function Home() {
                   Professional resumes, easy to edit
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  54 editable resume templates are included across ATS, executive, modern and creative styles.
+                  72 editable resume templates are included across A4 and US Letter styles.
                 </p>
               </div>
 
@@ -292,7 +310,15 @@ export default function Home() {
                   href={item.href}
                   className="group"
                 >
-                  <div className="aspect-[3/4] rounded-2xl border bg-white p-3 shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-xl">
+                  <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border bg-white p-3 shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-xl">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt=""
+                        className="absolute right-3 top-3 h-10 w-10 rounded-full border-2 border-white object-cover shadow"
+                        loading="lazy"
+                      />
+                    )}
                     <div className={`h-3 w-12 rounded-full ${item.accent}`} />
                     <div className="mt-4 h-2 w-3/4 rounded-full bg-slate-800" />
                     <div className="mt-2 h-1.5 w-1/2 rounded-full bg-slate-300" />

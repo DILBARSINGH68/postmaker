@@ -1175,8 +1175,8 @@ export default function EditorPage() {
     const requestedPanel = params.get("panel");
     const requestedNewDesign = params.get("new") === "1";
 
-    if (requestedPanel === "festival") {
-      setActivePanel("festival");
+    if (requestedPanel === "festival" || requestedPanel === "templates") {
+      setActivePanel(requestedPanel);
     }
 
     const requestedFormat = requestedFormatName
@@ -1192,10 +1192,12 @@ export default function EditorPage() {
         syncCanvasToFormat(c, templateFormat);
 
         setFormat(templateFormat);
+        setZoom(fitZoomForFormat(templateFormat));
       } else if (requestedFormat) {
         syncCanvasToFormat(c, requestedFormat);
 
         setFormat(requestedFormat);
+        setZoom(fitZoomForFormat(requestedFormat));
       }
 
       applyTemplate(c, requestedTemplate);
@@ -1216,7 +1218,9 @@ export default function EditorPage() {
           : "New Social Design"
       );
 
-      if (requestedTemplate.startsWith("festival-")) {
+      if (window.innerWidth < 768) {
+        setActivePanel(null);
+      } else if (requestedTemplate.startsWith("festival-")) {
         setActivePanel("festival");
       }
 
@@ -1235,6 +1239,7 @@ export default function EditorPage() {
         syncCanvasToFormat(c, requestedFormat);
 
         setFormat(requestedFormat);
+        setZoom(fitZoomForFormat(requestedFormat));
       }
 
       c.clear();
@@ -1276,6 +1281,7 @@ export default function EditorPage() {
 
         const restoredFormat = autosave.format || FORMATS[0];
         setFormat(restoredFormat);
+        setZoom(fitZoomForFormat(restoredFormat));
 
         const restoredPages: DesignPage[] = autosave.pages?.length
           ? autosave.pages
@@ -4288,23 +4294,21 @@ export default function EditorPage() {
   const fitZoomForFormat = (
     nextFormat: Format
   ) => {
-    const size =
-      getEditorCanvasSize(
-        nextFormat
-      );
+    const size = getEditorCanvasSize(nextFormat);
 
-    const maxSide =
-      Math.max(
-        size.width,
-        size.height
-      );
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      const availableWidth = Math.max(240, window.innerWidth - 24);
+      const availableHeight = Math.max(280, window.innerHeight - 252);
+      const widthZoom = (availableWidth / Math.max(1, size.width)) * 100;
+      const heightZoom = (availableHeight / Math.max(1, size.height)) * 100;
 
-    if (maxSide >= 1350)
-      return 57;
+      return Math.max(18, Math.min(72, Math.floor(Math.min(widthZoom, heightZoom))));
+    }
 
-    if (maxSide >= 1100)
-      return 62;
+    const maxSide = Math.max(size.width, size.height);
 
+    if (maxSide >= 1350) return 57;
+    if (maxSide >= 1100) return 62;
     return 68;
   };
 
@@ -4547,7 +4551,9 @@ export default function EditorPage() {
         : "New Social Design"
     );
 
-    if (type.startsWith("festival-")) {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setActivePanel(null);
+    } else if (type.startsWith("festival-")) {
       setActivePanel("festival");
     }
 
@@ -5190,12 +5196,14 @@ export default function EditorPage() {
   };
 
   return (
-    <main className="h-screen overflow-hidden bg-[#f3f3f3] text-gray-900">
+    <main className="h-[100dvh] overflow-hidden bg-[#f3f3f3] text-gray-900">
       <EditorHeader
         projectName={projectName}
         saved={saved}
         canUndo={historyState.undo}
         canRedo={historyState.redo}
+        format={format}
+        pageCount={Math.max(1, pages.length)}
         onProjectNameChange={(value) => {
           setProjectName(value);
           setSaved(false);
@@ -5216,7 +5224,7 @@ export default function EditorPage() {
         }}
       />
 
-      <div className="relative flex h-[calc(100vh-172px)] min-h-0 min-w-0 overflow-hidden md:h-[calc(100vh-100px)]">
+      <div className="relative flex h-[calc(100dvh-120px)] min-h-0 min-w-0 overflow-hidden md:h-[calc(100vh-100px)]">
         <LeftRail activePanel={activePanel} onTogglePanel={togglePanel} />
 
         <SidePanel

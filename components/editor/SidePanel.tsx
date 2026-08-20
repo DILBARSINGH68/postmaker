@@ -406,11 +406,28 @@ function TemplateThumb({
 
   return (
     <div
-      className={`relative mb-2 overflow-hidden rounded-lg ${ratioClass}`}
+      className={`relative mb-2 overflow-hidden rounded-lg border border-black/5 ${ratioClass}`}
       style={{
         backgroundColor: template.bg,
       }}
     >
+      {template.image && (
+        <>
+          <img
+            src={template.image}
+            alt={`${template.name} template visual`}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(135deg, ${template.bg}e6 0%, ${template.bg}88 46%, transparent 78%)`,
+            }}
+          />
+        </>
+      )}
+
       {layout === 0 && (
         <>
           <div
@@ -871,13 +888,13 @@ export default function SidePanel(
 
   return (
     <aside
-      className="fixed inset-x-0 bottom-[calc(116px_+_env(safe-area-inset-bottom))] z-40 flex max-h-[calc(100dvh_-_188px_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden rounded-t-2xl border-t bg-white shadow-2xl md:static md:z-auto md:h-full md:max-h-none md:w-[320px] md:shrink-0 md:rounded-none md:border-r md:border-t-0 md:shadow-none"
+      className="fixed inset-x-0 bottom-[calc(64px_+_env(safe-area-inset-bottom))] z-40 flex max-h-[calc(100dvh_-_126px_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden rounded-t-2xl border-t bg-white shadow-2xl md:static md:z-auto md:h-full md:max-h-none md:w-[300px] md:shrink-0 md:rounded-none md:border-r md:border-t-0 md:shadow-none"
       style={{
-        flex: "0 0 320px",
+        flex: "0 0 300px",
       }}
     >
-      <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-4 py-3">
-        <h2 className="font-semibold capitalize">
+      <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-3 py-2.5">
+        <h2 className="text-[13px] font-semibold capitalize">
           {props.activePanel ===
           "imageEdit"
             ? "Edit image"
@@ -892,13 +909,13 @@ export default function SidePanel(
 
         <button
           onClick={props.onClose}
-          className="rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
+          className="rounded-lg px-2.5 py-1.5 text-xs hover:bg-gray-100"
         >
           ✕
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-5">
         {(props.activePanel ===
           "templates" ||
           props.activePanel ===
@@ -1012,7 +1029,7 @@ export default function SidePanel(
             </div>
 
             {filteredTemplates.length ? (
-              <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="mt-2 grid grid-cols-2 gap-2.5">
                 {filteredTemplates.map(
                   (template) => {
                     const favorite =
@@ -1025,7 +1042,7 @@ export default function SidePanel(
                         key={
                           template.type
                         }
-                        className="group relative rounded-xl border bg-white p-2 transition hover:border-violet-300 hover:shadow-md"
+                        className="group relative rounded-xl border bg-white p-1.5 transition hover:border-violet-300 hover:shadow-md"
                       >
                         <button
                           onClick={() =>

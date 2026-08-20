@@ -81,8 +81,8 @@ export default function ContextToolbar(
   ].includes(type);
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-2 z-40 w-full -translate-x-1/2 px-2 md:top-3 md:w-auto md:px-3">
-      <div className="pointer-events-auto mx-auto flex max-w-[calc(100vw-16px)] items-center gap-2 overflow-x-auto overscroll-x-contain rounded-2xl border bg-white px-3 py-2 shadow-xl md:max-w-[calc(100vw-100px)]">
+    <div className="pointer-events-none absolute bottom-2 left-1/2 z-40 w-full -translate-x-1/2 px-2 md:bottom-auto md:top-3 md:w-auto md:px-3">
+      <div className="pointer-events-auto mx-auto flex max-w-[calc(100vw-16px)] items-center gap-1 overflow-x-auto overscroll-x-contain rounded-xl border bg-white px-2 py-1.5 text-xs shadow-xl md:max-w-[calc(100vw-100px)] md:gap-2 md:rounded-2xl md:px-3 md:py-2">
         {isMultiSelection && (
           <span className="whitespace-nowrap rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
             {selected.selectionCount || 2} selected

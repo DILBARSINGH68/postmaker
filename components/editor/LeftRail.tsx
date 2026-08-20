@@ -26,21 +26,21 @@ const ITEMS: {
 export default function LeftRail({ activePanel, onTogglePanel }: Props) {
   return (
     <aside
-      className="hidden h-full min-h-0 shrink-0 overflow-y-auto overscroll-contain border-r bg-white py-2 md:block"
-      style={{ width: 76, flex: "0 0 76px" }}
+      className="hidden h-full min-h-0 shrink-0 overflow-y-auto overscroll-contain border-r bg-white py-1.5 md:block"
+      style={{ width: 68, flex: "0 0 68px" }}
     >
       {ITEMS.map((item) => (
         <button
           key={item.key}
           onClick={() => onTogglePanel(item.key)}
-          className={`mx-2 mb-1 w-[60px] rounded-xl px-1 py-3 text-center text-[11px] transition ${
+          className={`mx-1.5 mb-0.5 w-[56px] rounded-xl px-1 py-2 text-center text-[9.5px] font-medium leading-tight transition ${
             activePanel === item.key
               ? "bg-black text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           }`}
         >
-          <div className="text-xl leading-none">{item.icon}</div>
-          <div className="mt-2">{item.label}</div>
+          <div className="text-[17px] leading-none">{item.icon}</div>
+          <div className="mt-1.5 truncate">{item.label}</div>
         </button>
       ))}
     </aside>

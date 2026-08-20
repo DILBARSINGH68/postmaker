@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject, type TouchEvent } from "react";
 import { StaticCanvas } from "fabric";
 
 import type { DesignPage, Format } from "@/types/editor";
@@ -157,6 +157,37 @@ export default function CanvasArea(props: Props) {
   const editorSize = getEditorCanvasSize(props.format);
   const scale = props.zoom / 100;
   const sectionRef = useRef<HTMLElement | null>(null);
+  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+
+  const getTouchDistance = (event: TouchEvent<HTMLElement>) => {
+    const first = event.touches[0];
+    const second = event.touches[1];
+    if (!first || !second) return 0;
+    return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+  };
+
+  const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length !== 2) return;
+    const distance = getTouchDistance(event);
+    if (!distance) return;
+    pinchRef.current = { distance, zoom: props.zoom };
+    if (event.cancelable) event.preventDefault();
+  };
+
+  const handleTouchMove = (event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length !== 2 || !pinchRef.current) return;
+    const distance = getTouchDistance(event);
+    if (!distance) return;
+    const nextZoom = Math.round(
+      Math.min(180, Math.max(18, pinchRef.current.zoom * (distance / pinchRef.current.distance)))
+    );
+    props.onZoomChange(nextZoom);
+    if (event.cancelable) event.preventDefault();
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length < 2) pinchRef.current = null;
+  };
 
   const displayWidth = Math.max(1, Math.round(editorSize.width * scale));
   const displayHeight = Math.max(1, Math.round(editorSize.height * scale));
@@ -189,9 +220,13 @@ export default function CanvasArea(props: Props) {
   return (
     <section
       ref={sectionRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-[#ececec] touch-pan-x touch-pan-y"
     >
-      <div className="flex h-max min-h-full w-max min-w-full justify-center p-4 pb-48 pt-10 md:p-10 md:pb-20 md:pt-12">
+      <div className="flex h-max min-h-full w-max min-w-full justify-center p-3 pb-28 pt-4 sm:p-4 sm:pb-32 sm:pt-6 md:p-10 md:pb-20 md:pt-12">
         <div
           className="relative shrink-0"
           style={{
@@ -376,24 +411,23 @@ export default function CanvasArea(props: Props) {
         </div>
       </div>
 
-      <div className="sticky bottom-[132px] left-1/2 z-30 mx-auto flex w-fit -translate-x-1/2 items-center gap-3 rounded-full border bg-white px-4 py-2 shadow-lg md:hidden">
+      <div className="sticky bottom-[calc(72px_+_env(safe-area-inset-bottom))] left-1/2 z-30 mx-auto flex w-fit -translate-x-1/2 items-center gap-1 rounded-full border bg-white/95 px-2 py-1 text-xs shadow-lg backdrop-blur sm:hidden">
         <button
-          onClick={() => props.onZoomChange(Math.max(25, props.zoom - 10))}
+          onClick={() => props.onZoomChange(Math.max(18, props.zoom - 8))}
           className="px-2"
         >
           −
         </button>
 
-        <button
-          onClick={() => props.onZoomChange(57)}
-          className="min-w-12 text-center text-sm"
-          title="Reset zoom"
+        <span
+          className="min-w-11 rounded-full px-1.5 py-1 text-center text-[11px] font-semibold"
+          title="Pinch with two fingers to zoom"
         >
           {props.zoom}%
-        </button>
+        </span>
 
         <button
-          onClick={() => props.onZoomChange(Math.min(110, props.zoom + 10))}
+          onClick={() => props.onZoomChange(Math.min(180, props.zoom + 8))}
           className="px-2"
         >
           +
