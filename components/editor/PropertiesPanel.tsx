@@ -518,16 +518,15 @@ export default function PropertiesPanel(props: Props) {
         onClick={props.duplicateSelected}
         className="w-full rounded-xl border p-3 text-sm hover:bg-gray-50"
       >
-        ⧉ Duplicate
+        â§‰ Duplicate
       </button>
 
       <button
         onClick={props.deleteSelected}
         className="w-full rounded-xl border border-red-200 p-3 text-sm text-red-600 hover:bg-red-50"
       >
-        🗑 Delete
+        ðŸ—‘ Delete
       </button>
     </div>
   );
 }
-winget install --id Git.Git -e --source winget
