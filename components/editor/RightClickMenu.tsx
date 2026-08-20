@@ -1,0 +1,222 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Props = {
+  x: number;
+  y: number;
+  objectType: string;
+  locked: boolean;
+  onClose: () => void;
+  onCopy: () => void;
+  onCopyStyle: () => void;
+  onPaste: () => void;
+  onPasteStyle: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onBringToFront: () => void;
+  onBringForward: () => void;
+  onSendBackward: () => void;
+  onSendToBack: () => void;
+  onAlign: (
+    value:
+      | "left"
+      | "center"
+      | "right"
+      | "top"
+      | "middle"
+      | "bottom"
+  ) => void;
+  onLock: () => void;
+  onLink: () => void;
+  onAltText: () => void;
+  onSetImageAsBackground: () => void;
+  onApplyColorToPage: () => void;
+  onDownloadSelection: () => void;
+  onInfo: () => void;
+  onUnavailable: (name: string) => void;
+};
+
+function MenuButton({
+  children,
+  shortcut,
+  onClick,
+  danger = false,
+}: {
+  children: React.ReactNode;
+  shortcut?: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-5 rounded-lg px-3 py-2 text-left text-sm ${
+        danger
+          ? "text-red-600 hover:bg-red-50"
+          : "hover:bg-gray-100"
+      }`}
+    >
+      <span>{children}</span>
+      {shortcut && (
+        <span className="rounded-md bg-gray-100 px-2 py-1 text-[11px] text-gray-500">
+          {shortcut}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export default function RightClickMenu(props: Props) {
+  const [submenu, setSubmenu] = useState<"layer" | "align" | null>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-postmaker-context-menu]")) {
+        props.onClose();
+      }
+    };
+
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") props.onClose();
+    };
+
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", esc);
+
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [props]);
+
+  const isImage = ["image", "fabricimage"].includes(
+    props.objectType.toLowerCase()
+  );
+
+  return (
+    <div
+      data-postmaker-context-menu
+      className="fixed z-[200] w-72 rounded-2xl border bg-white p-2 shadow-2xl"
+      style={{
+        left: Math.min(props.x, window.innerWidth - 300),
+        top: Math.min(props.y, window.innerHeight - 610),
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <MenuButton onClick={props.onCopy} shortcut="Ctrl+C">
+        ⧉ Copy
+      </MenuButton>
+
+      <MenuButton onClick={props.onCopyStyle} shortcut="Ctrl+Alt+C">
+        🖌 Copy style
+      </MenuButton>
+
+      <MenuButton onClick={props.onPaste} shortcut="Ctrl+V">
+        📋 Paste
+      </MenuButton>
+
+      <MenuButton onClick={props.onPasteStyle}>
+        🖌 Paste style
+      </MenuButton>
+
+      <MenuButton onClick={props.onDuplicate} shortcut="Ctrl+D">
+        ⧉ Duplicate
+      </MenuButton>
+
+      <MenuButton onClick={props.onDelete} shortcut="Delete" danger>
+        🗑 Delete
+      </MenuButton>
+
+      <div className="my-1 border-t" />
+
+      <button
+        onClick={() =>
+          setSubmenu((value) => (value === "layer" ? null : "layer"))
+        }
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
+      >
+        <span>◈ Layer</span>
+        <span>›</span>
+      </button>
+
+      {submenu === "layer" && (
+        <div className="ml-4 space-y-1 border-l pl-2">
+          <MenuButton onClick={props.onBringToFront}>Bring to front</MenuButton>
+          <MenuButton onClick={props.onBringForward}>Bring forward</MenuButton>
+          <MenuButton onClick={props.onSendBackward}>Send backward</MenuButton>
+          <MenuButton onClick={props.onSendToBack}>Send to back</MenuButton>
+        </div>
+      )}
+
+      <button
+        onClick={() =>
+          setSubmenu((value) => (value === "align" ? null : "align"))
+        }
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
+      >
+        <span>☷ Align to page</span>
+        <span>›</span>
+      </button>
+
+      {submenu === "align" && (
+        <div className="ml-4 grid grid-cols-2 gap-1 border-l pl-2">
+          {[
+            ["left", "Left"],
+            ["center", "Center"],
+            ["right", "Right"],
+            ["top", "Top"],
+            ["middle", "Middle"],
+            ["bottom", "Bottom"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => props.onAlign(value as any)}
+              className="rounded-lg px-2 py-2 text-left text-xs hover:bg-gray-100"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="my-1 border-t" />
+
+
+
+      <MenuButton onClick={props.onLock} shortcut="Alt+Shift+L">
+        🔒 {props.locked ? "Unlock" : "Lock"}
+      </MenuButton>
+
+      <MenuButton onClick={props.onLink} shortcut="Ctrl+K">
+        🔗 Link
+      </MenuButton>
+
+
+      <MenuButton onClick={props.onAltText}>
+        ⓐ Alternative text
+      </MenuButton>
+
+      <div className="my-1 border-t" />
+
+      {isImage && (
+        <MenuButton onClick={props.onSetImageAsBackground}>
+          ▨ Set image as background
+        </MenuButton>
+      )}
+
+      <MenuButton onClick={props.onApplyColorToPage}>
+        🎨 Apply color to page
+      </MenuButton>
+
+      <MenuButton onClick={props.onDownloadSelection}>
+        ↓ Download selection
+      </MenuButton>
+
+      <MenuButton onClick={props.onInfo}>
+        ⓘ Info
+      </MenuButton>
+    </div>
+  );
+}
