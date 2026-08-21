@@ -10,6 +10,11 @@ import {
 import type { Format } from "@/types/editor";
 import { FESTIVALS } from "@/lib/editor/festivals";
 import { getSocialTemplateImage } from "@/lib/editor/templateImages";
+import {
+  PREMIUM_TEMPLATE_DEFINITIONS,
+  applyPremiumTemplate,
+  isPremiumTemplate,
+} from "@/lib/editor/premiumTemplates";
 
 export type TemplateType = string;
 
@@ -412,6 +417,7 @@ const LETTER_RESUME_DEFINITIONS: TemplateDefinition[] =
   );
 
 const DEFINITIONS = [
+  ...PREMIUM_TEMPLATE_DEFINITIONS,
   ...SOCIAL_DEFINITIONS,
   ...EXTRA_SOCIAL_DEFINITIONS,
   ...FESTIVAL_DEFINITIONS,
@@ -3441,6 +3447,11 @@ export function applyTemplate(
 
   (canvas as any).__postMakerTemplateToken =
     renderToken;
+
+  if (isPremiumTemplate(type)) {
+    applyPremiumTemplate(canvas, type, renderToken);
+    return;
+  }
 
   if (item.kind === "resume") {
     resumeTemplate(

@@ -1057,6 +1057,11 @@ export default function SidePanel(
                         }
                         className="group relative rounded-xl border bg-white p-1.5 transition hover:border-violet-300 hover:shadow-md"
                       >
+                        {template.type.startsWith("premium-") && (
+                          <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white shadow">
+                            ✦ Kriyavo Premium
+                          </span>
+                        )}
                         <button
                           onClick={() =>
                             useTemplate(

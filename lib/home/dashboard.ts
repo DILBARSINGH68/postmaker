@@ -57,7 +57,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: "Resume Maker",
     subtitle: "A4 editable resume",
     icon: "▤",
-    href: "/editor?template=resume-modern-split-1&new=1",
+    href: "/editor?template=premium-resume-executive-navy&new=1",
     tone: "from-emerald-500 to-teal-500",
   },
   {
@@ -76,7 +76,7 @@ export const FEATURED = [
     image: getSocialTemplateImage("creator"),
     tone: "from-violet-600 via-fuchsia-500 to-pink-500",
     tag: "Social media",
-    href: "/editor?template=social-creator-1&new=1",
+    href: "/editor?template=premium-instagram-creator-neon&new=1",
   },
   {
     title: "Food stories",
@@ -84,7 +84,7 @@ export const FEATURED = [
     image: getSocialTemplateImage("food"),
     tone: "from-orange-400 via-amber-400 to-yellow-300",
     tag: "Instagram",
-    href: "/editor?template=social-food-2&new=1",
+    href: "/editor?template=premium-instagram-food-studio&new=1",
   },
   {
     title: "Creator growth",
@@ -92,7 +92,7 @@ export const FEATURED = [
     image: getSocialTemplateImage("creator"),
     tone: "from-cyan-500 via-sky-500 to-blue-600",
     tag: "Creator",
-    href: "/editor?template=social-creator-3&new=1",
+    href: "/editor?template=premium-linkedin-hiring&new=1",
   },
   {
     title: "Professional resume",
@@ -100,7 +100,7 @@ export const FEATURED = [
     image: getSocialTemplateImage("business"),
     tone: "from-emerald-500 via-teal-500 to-cyan-500",
     tag: "Resume",
-    href: "/editor?template=resume-minimal-ats-1&new=1",
+    href: "/editor?template=premium-resume-minimal-ats&new=1",
   },
   {
     title: "Sale campaign",
@@ -108,7 +108,7 @@ export const FEATURED = [
     image: getSocialTemplateImage("sale"),
     tone: "from-rose-500 via-red-500 to-orange-500",
     tag: "Marketing",
-    href: "/editor?template=social-sale-4&new=1",
+    href: "/editor?template=premium-instagram-sale-bold&new=1",
   },
   {
     title: "Festival greetings",
@@ -124,156 +124,33 @@ export const FEATURED = [
     image: getSocialTemplateImage("business"),
     tone: "from-indigo-600 via-violet-600 to-purple-600",
     tag: "Business",
-    href: "/editor?template=social-business-7&new=1",
+    href: "/editor?template=premium-facebook-business-consulting&new=1",
   },
 ];
 
 export const SOCIAL_TEMPLATE_PREVIEWS = [
-  {
-    "id": "social-sale-1",
-    "title": "Sale 01",
-    "tone": "from-zinc-950 to-violet-800",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-1&new=1"
-  },
-  {
-    "id": "social-sale-2",
-    "title": "Sale 02",
-    "tone": "from-cyan-200 to-sky-500",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-2&new=1"
-  },
-  {
-    "id": "social-sale-3",
-    "title": "Sale 03",
-    "tone": "from-orange-200 to-rose-500",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-3&new=1"
-  },
-  {
-    "id": "social-sale-4",
-    "title": "Sale 04",
-    "tone": "from-emerald-100 to-emerald-500",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-4&new=1"
-  },
-  {
-    "id": "social-sale-5",
-    "title": "Sale 05",
-    "tone": "from-pink-100 to-rose-500",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-5&new=1"
-  },
-  {
-    "id": "social-sale-6",
-    "title": "Sale 06",
-    "tone": "from-yellow-100 to-amber-400",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-6&new=1"
-  },
-  {
-    "id": "social-sale-7",
-    "title": "Sale 07",
-    "tone": "from-violet-100 to-purple-600",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-7&new=1"
-  },
-  {
-    "id": "social-sale-8",
-    "title": "Sale 08",
-    "tone": "from-blue-100 to-blue-600",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-8&new=1"
-  },
-  {
-    "id": "social-sale-9",
-    "title": "Sale 09",
-    "tone": "from-stone-100 to-stone-400",
-    "image": getSocialTemplateImage("sale"),
-    "href": "/editor?template=social-sale-9&new=1"
-  },
-  {
-    "id": "social-business-1",
-    "title": "Business 01",
-    "tone": "from-zinc-950 to-violet-800",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=social-business-1&new=1"
-  },
-  {
-    "id": "social-business-2",
-    "title": "Business 02",
-    "tone": "from-cyan-200 to-sky-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=social-business-2&new=1"
-  },
-  {
-    "id": "social-business-3",
-    "title": "Business 03",
-    "tone": "from-orange-200 to-rose-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=social-business-3&new=1"
-  }
+  { id: "premium-instagram-fashion-editorial", title: "Fashion Editorial", tone: "from-stone-100 to-rose-500", image: getSocialTemplateImage("fashion"), href: "/editor?template=premium-instagram-fashion-editorial&new=1" },
+  { id: "premium-instagram-creator-neon", title: "Creator Neon", tone: "from-slate-950 to-lime-400", image: getSocialTemplateImage("creator"), href: "/editor?template=premium-instagram-creator-neon&new=1" },
+  { id: "premium-instagram-food-studio", title: "Food Studio", tone: "from-orange-50 to-orange-600", image: getSocialTemplateImage("food"), href: "/editor?template=premium-instagram-food-studio&new=1" },
+  { id: "premium-instagram-sale-bold", title: "Bold Commerce", tone: "from-yellow-300 to-red-500", image: getSocialTemplateImage("sale"), href: "/editor?template=premium-instagram-sale-bold&new=1" },
+  { id: "premium-instagram-realestate-luxe", title: "Luxe Listing", tone: "from-stone-100 to-emerald-700", image: getSocialTemplateImage("realestate"), href: "/editor?template=premium-instagram-realestate-luxe&new=1" },
+  { id: "premium-instagram-fitness-impact", title: "Fitness Impact", tone: "from-neutral-950 to-orange-600", image: getSocialTemplateImage("fitness"), href: "/editor?template=premium-instagram-fitness-impact&new=1" },
+  { id: "premium-story-travel-editorial", title: "Travel Story", tone: "from-sky-100 to-orange-500", image: getSocialTemplateImage("travel"), href: "/editor?template=premium-story-travel-editorial&new=1" },
+  { id: "premium-story-event-night", title: "Night Event", tone: "from-purple-950 to-fuchsia-500", image: getSocialTemplateImage("event"), href: "/editor?template=premium-story-event-night&new=1" },
+  { id: "premium-youtube-business-growth", title: "Business Growth", tone: "from-slate-950 to-sky-500", image: getSocialTemplateImage("business"), href: "/editor?template=premium-youtube-business-growth&new=1" },
+  { id: "premium-youtube-finance-money", title: "Money Simple", tone: "from-stone-100 to-emerald-700", image: getSocialTemplateImage("finance"), href: "/editor?template=premium-youtube-finance-money&new=1" },
+  { id: "premium-linkedin-leadership", title: "Leadership Note", tone: "from-stone-100 to-stone-700", image: getSocialTemplateImage("business"), href: "/editor?template=premium-linkedin-leadership&new=1" },
+  { id: "premium-portrait-travel-diary", title: "Travel Diary", tone: "from-cyan-50 to-orange-400", image: getSocialTemplateImage("travel"), href: "/editor?template=premium-portrait-travel-diary&new=1" }
 ];
 
 export const RESUME_PREVIEWS = [
-  {
-    "id": "resume-modern-split-1",
-    "title": "Modern Split 01",
-    "accent": "bg-violet-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-modern-split-1&new=1"
-  },
-  {
-    "id": "resume-executive-2",
-    "title": "Executive 02",
-    "accent": "bg-orange-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-executive-2&new=1"
-  },
-  {
-    "id": "resume-editorial-3",
-    "title": "Editorial 03",
-    "accent": "bg-blue-600",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-editorial-3&new=1"
-  },
-  {
-    "id": "resume-minimal-ats-4",
-    "title": "Minimal ATS 04",
-    "accent": "bg-emerald-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-minimal-ats-4&new=1"
-  },
-  {
-    "id": "resume-creative-grid-5",
-    "title": "Creative Grid 05",
-    "accent": "bg-fuchsia-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-creative-grid-5&new=1"
-  },
-  {
-    "id": "resume-dark-luxe-6",
-    "title": "Dark Luxe 06",
-    "accent": "bg-orange-500",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-dark-luxe-6&new=1"
-  },
-  {
-    "id": "resume-modern-split-7",
-    "title": "Modern Split 07",
-    "accent": "bg-teal-600",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-modern-split-7&new=1"
-  },
-  {
-    "id": "resume-executive-8",
-    "title": "Executive 08",
-    "accent": "bg-violet-600",
-    "image": getSocialTemplateImage("business"),
-    "href": "/editor?template=resume-executive-8&new=1"
-  }
+  { id: "premium-resume-executive-navy", title: "Executive Navy", accent: "bg-blue-700", image: getSocialTemplateImage("business"), href: "/editor?template=premium-resume-executive-navy&new=1" },
+  { id: "premium-resume-creative-coral", title: "Creative Coral", accent: "bg-rose-500", image: getSocialTemplateImage("creator"), href: "/editor?template=premium-resume-creative-coral&new=1" },
+  { id: "premium-resume-minimal-ats", title: "Minimal ATS Pro", accent: "bg-slate-700", image: getSocialTemplateImage("business"), href: "/editor?template=premium-resume-minimal-ats&new=1" },
+  { id: "premium-resume-tech-green", title: "Tech Product Green", accent: "bg-emerald-500", image: getSocialTemplateImage("education"), href: "/editor?template=premium-resume-tech-green&new=1" },
+  { id: "premium-resume-editorial-olive", title: "Editorial Olive", accent: "bg-emerald-800", image: getSocialTemplateImage("fashion"), href: "/editor?template=premium-resume-editorial-olive&new=1" },
+  { id: "premium-resume-dark-studio", title: "Dark Studio", accent: "bg-fuchsia-500", image: getSocialTemplateImage("creator"), href: "/editor?template=premium-resume-dark-studio&new=1" }
 ];
-
 
 export const FESTIVAL_PREVIEWS = FESTIVALS.slice(0, 12).map((item) => ({
   id: `festival-${item.slug}`,
