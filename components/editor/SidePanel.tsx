@@ -111,6 +111,7 @@ type Props = {
   onToggleLayerLock: (
     object: FabricObject
   ) => void;
+  onReorderLayer: (dragged: FabricObject, target: FabricObject) => void;
   onClear: () => void;
 
   onImageAdjust: (changes: {
@@ -594,6 +595,11 @@ export default function SidePanel(
     backgroundTolerance,
     setBackgroundTolerance,
   ] = useState(58);
+
+  const [draggedLayer, setDraggedLayer] =
+    useState<FabricObject | null>(null);
+  const [dragOverLayer, setDragOverLayer] =
+    useState<FabricObject | null>(null);
 
   const [
     templateView,
@@ -1453,6 +1459,13 @@ export default function SidePanel(
         {props.activePanel ===
           "layers" && (
           <>
+            <div className="mb-3 rounded-xl bg-violet-50 px-3 py-2 text-[11px] font-medium leading-5 text-violet-700">
+              <div>Drag layers up or down to reorder. Top item is the front-most layer.</div>
+              <div className="mt-1 text-[10px] font-semibold text-violet-500">
+                Ctrl+] forward · Ctrl+[ backward · Ctrl+Alt+] front · Ctrl+Alt+[ back
+              </div>
+            </div>
+
             <div className="space-y-2">
               {props.objects
                 .length === 0 && (
@@ -1481,19 +1494,69 @@ export default function SidePanel(
                     const locked =
                       object.selectable ===
                       false;
+                    const isDragOver =
+                      dragOverLayer === object && draggedLayer !== object;
 
                     return (
                       <div
                         key={`${object.type}-${originalIndex}`}
-                        className="flex items-center gap-2 rounded-xl border p-2"
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedLayer(object);
+                          setDragOverLayer(null);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData(
+                            "text/plain",
+                            String(originalIndex)
+                          );
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setDragOverLayer(object);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverLayer === object) {
+                            setDragOverLayer(null);
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggedLayer && draggedLayer !== object) {
+                            props.onReorderLayer(draggedLayer, object);
+                          }
+                          setDraggedLayer(null);
+                          setDragOverLayer(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedLayer(null);
+                          setDragOverLayer(null);
+                        }}
+                        className={`flex cursor-grab items-center gap-2 rounded-xl border p-2 transition active:cursor-grabbing ${
+                          isDragOver
+                            ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100"
+                            : draggedLayer === object
+                            ? "opacity-50"
+                            : "bg-white"
+                        }`}
                       >
+                        <span
+                          className="select-none text-sm font-black tracking-[-0.18em] text-gray-300"
+                          title="Drag to reorder"
+                          aria-hidden="true"
+                        >
+                          ⋮⋮
+                        </span>
+
                         <button
+                          type="button"
                           onClick={() =>
                             props.onToggleLayerVisibility(
                               object
                             )
                           }
                           className="rounded-lg px-2 py-1 text-xs hover:bg-gray-100"
+                          title={visible ? "Hide layer" : "Show layer"}
                         >
                           {visible
                             ? "👁"
@@ -1501,12 +1564,13 @@ export default function SidePanel(
                         </button>
 
                         <button
+                          type="button"
                           onClick={() =>
                             props.onSelectLayer(
                               object
                             )
                           }
-                          className="min-w-0 flex-1 truncate text-left text-sm"
+                          className="min-w-0 flex-1 truncate text-left text-sm font-medium"
                         >
                           {layerName(
                             object,
@@ -1515,12 +1579,14 @@ export default function SidePanel(
                         </button>
 
                         <button
+                          type="button"
                           onClick={() =>
                             props.onToggleLayerLock(
                               object
                             )
                           }
                           className="rounded-lg px-2 py-1 text-xs hover:bg-gray-100"
+                          title={locked ? "Unlock layer" : "Lock layer"}
                         >
                           {locked
                             ? "🔒"

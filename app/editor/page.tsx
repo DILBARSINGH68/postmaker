@@ -1914,6 +1914,108 @@ export default function EditorPage() {
 
       const commandKey = e.ctrlKey || e.metaKey;
       const pressedKey = e.key.toLowerCase();
+      const rightBracket = pressedKey === "]" || e.code === "BracketRight";
+      const leftBracket = pressedKey === "[" || e.code === "BracketLeft";
+
+      // Canva-style layer shortcuts.
+      // Ctrl/Cmd + ] or [ moves one layer; adding Alt/Option moves all the way.
+      if (commandKey && rightBracket) {
+        e.preventDefault();
+        if (e.altKey || e.shiftKey) bringToFront();
+        else bringForward();
+        return;
+      }
+
+      if (commandKey && leftBracket) {
+        e.preventDefault();
+        if (e.altKey || e.shiftKey) sendToBack();
+        else sendBackward();
+        return;
+      }
+
+      // Canva-style lock toggle.
+      if (
+        pressedKey === "l" &&
+        ((e.altKey && e.shiftKey && !commandKey) || (commandKey && e.altKey))
+      ) {
+        e.preventDefault();
+        toggleSelectedLock();
+        return;
+      }
+
+      // Add a page after the current page.
+      if (commandKey && pressedKey === "enter") {
+        e.preventDefault();
+        addDesignPage();
+        return;
+      }
+
+      // Fast element tools when focus is not inside a form/text editor.
+      if (!commandKey && !e.altKey && !e.shiftKey) {
+        if (pressedKey === "t") {
+          e.preventDefault();
+          addText("Add a heading", 56, "bold");
+          return;
+        }
+        if (pressedKey === "r") {
+          e.preventDefault();
+          addRectangle();
+          return;
+        }
+        if (pressedKey === "c") {
+          e.preventDefault();
+          addCircle();
+          return;
+        }
+        if (pressedKey === "l") {
+          e.preventDefault();
+          addLine();
+          return;
+        }
+      }
+
+      // Zoom shortcuts.
+      if (commandKey && (pressedKey === "+" || pressedKey === "=")) {
+        e.preventDefault();
+        setZoom((current) => Math.min(180, current + 5));
+        return;
+      }
+
+      if (commandKey && pressedKey === "-") {
+        e.preventDefault();
+        setZoom((current) => Math.max(18, current - 5));
+        return;
+      }
+
+      if (commandKey && pressedKey === "0") {
+        e.preventDefault();
+        setZoom(fitZoomForFormat(format));
+        return;
+      }
+
+      // Tab cycles through visible/selectable layers.
+      if (!commandKey && !e.altKey && pressedKey === "tab") {
+        const selectable = c
+          .getObjects()
+          .filter((object) => object.visible !== false && object.selectable !== false);
+        if (selectable.length) {
+          e.preventDefault();
+          const current = c.getActiveObject();
+          const currentIndex = selectable.indexOf(current as FabricObject);
+          const direction = e.shiftKey ? -1 : 1;
+          const nextIndex =
+            currentIndex < 0
+              ? e.shiftKey
+                ? selectable.length - 1
+                : 0
+              : (currentIndex + direction + selectable.length) % selectable.length;
+          const next = selectable[nextIndex];
+          c.setActiveObject(next);
+          c.requestRenderAll();
+          setSelected(snapshotObject(next));
+          return;
+        }
+      }
 
       if (
         commandKey &&
@@ -1943,7 +2045,13 @@ export default function EditorPage() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        pasteSelectedStyle();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "v") {
         e.preventDefault();
         void pasteClipboard();
         return;
@@ -5559,6 +5667,58 @@ export default function EditorPage() {
     }
   };
 
+  const deselectCanvasObject = () => {
+    const c = canvas();
+    if (!c) return;
+
+    if (cropSessionRef.current) {
+      cancelInteractiveCrop();
+      return;
+    }
+
+    const active = c.getActiveObject() as any;
+    if (active?.isEditing && typeof active.exitEditing === "function") {
+      active.exitEditing();
+    }
+
+    c.discardActiveObject();
+    c.requestRenderAll();
+    setSelected(null);
+    setContextMenu(null);
+    setSnapGuides({ vertical: [], horizontal: [] });
+  };
+
+  const reorderLayer = (dragged: FabricObject, target: FabricObject) => {
+    const c = canvas();
+    if (!c || dragged === target) return;
+
+    const getIndex = (object: FabricObject) => c.getObjects().indexOf(object);
+    let fromIndex = getIndex(dragged);
+    const targetIndex = getIndex(target);
+
+    if (fromIndex < 0 || targetIndex < 0 || fromIndex === targetIndex) return;
+
+    // Fabric's object array is back -> front. Move one step at a time so
+    // grouped/image objects keep the same object identity and metadata.
+    while (fromIndex < targetIndex) {
+      c.bringObjectForward(dragged);
+      const nextIndex = getIndex(dragged);
+      if (nextIndex <= fromIndex) break;
+      fromIndex = nextIndex;
+    }
+
+    while (fromIndex > targetIndex) {
+      c.sendObjectBackwards(dragged);
+      const nextIndex = getIndex(dragged);
+      if (nextIndex >= fromIndex) break;
+      fromIndex = nextIndex;
+    }
+
+    c.requestRenderAll();
+    refreshObjects();
+    saveHistory();
+  };
+
   const selectLayer = (object: FabricObject) => {
     const c = canvas();
     if (!c) return;
@@ -5727,6 +5887,7 @@ export default function EditorPage() {
           onSelectLayer={selectLayer}
           onToggleLayerVisibility={toggleLayerVisibility}
           onToggleLayerLock={toggleLayerLock}
+          onReorderLayer={reorderLayer}
           onClear={clearDesign}
           onImageAdjust={(changes) => rebuildImageFilters(changes)}
           onImagePreset={(preset) => rebuildImageFilters({ preset })}
@@ -5804,6 +5965,7 @@ export default function EditorPage() {
             onDuplicatePage={duplicateDesignPageAt}
             onDeletePage={deleteDesignPageAt}
             onTogglePageHidden={toggleDesignPageHidden}
+            onDeselect={deselectCanvasObject}
           />
         </div>
       </div>

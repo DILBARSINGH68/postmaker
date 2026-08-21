@@ -24,6 +24,7 @@ type Props = {
   onDuplicatePage: (index: number) => void;
   onDeletePage: (index: number) => void;
   onTogglePageHidden: (index: number) => void;
+  onDeselect: () => void;
 };
 
 type PreviewProps = {
@@ -220,6 +221,11 @@ export default function CanvasArea(props: Props) {
   return (
     <section
       ref={sectionRef}
+      onPointerDown={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-kriyavo-canvas-interactive="true"]')) return;
+        props.onDeselect();
+      }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -373,6 +379,7 @@ export default function CanvasArea(props: Props) {
             }}
           >
             <div
+              data-kriyavo-canvas-interactive="true"
               className="pointer-events-auto absolute left-0 top-0 overflow-visible"
               style={{
                 width: editorSize.width,

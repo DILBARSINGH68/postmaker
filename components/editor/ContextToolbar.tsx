@@ -74,6 +74,7 @@ function SheetButton({ active, children, onClick }: { active?: boolean; children
 export default function ContextToolbar(props: Props) {
   const selected = props.selected;
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
+  const [desktopCornersOpen, setDesktopCornersOpen] = useState(false);
 
   if (!selected) return null;
 
@@ -95,6 +96,95 @@ export default function ContextToolbar(props: Props) {
   const cornerRadius = Math.max(
     0,
     Number(selected.cornerRadius ?? selected.rx ?? 0)
+  );
+
+  const cornerPresets = [0, 8, 16, 24, 32, 48, 96, 240];
+
+  const renderDesktopCorners = () => (
+    <button
+      type="button"
+      onClick={() => setDesktopCornersOpen((open) => !open)}
+      className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
+        desktopCornersOpen
+          ? "border-violet-500 bg-violet-50 text-violet-700"
+          : "bg-white hover:bg-gray-50"
+      }`}
+      title="Corner rounding"
+      aria-expanded={desktopCornersOpen}
+    >
+      <span className="h-3.5 w-4 rounded-[5px] border-2 border-current" />
+      <span>Corners</span>
+      <span className="min-w-5 text-right text-[10px] text-gray-400">
+        {Math.round(cornerRadius)}
+      </span>
+      <span className="text-[9px] text-gray-400">⌄</span>
+    </button>
+  );
+
+  const renderDesktopCornerDetails = () => (
+    <div className="pointer-events-auto absolute left-1/2 top-[calc(100%+8px)] z-[95] w-72 -translate-x-1/2 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="text-xs font-bold text-gray-900">Corner rounding</div>
+          <div className="mt-0.5 text-[10px] text-gray-400">Choose a preset or fine-tune the radius</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDesktopCornersOpen(false)}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[11px]"
+          aria-label="Close corner controls"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        {cornerPresets.map((radius) => {
+          const label = radius === 0 ? "None" : radius === 240 ? "Round" : String(radius);
+          const active =
+            radius === 240
+              ? cornerRadius >= 180
+              : Math.round(cornerRadius) === radius;
+
+          return (
+            <button
+              key={radius}
+              type="button"
+              onClick={() => props.onCornerRadiusChange(radius)}
+              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] font-semibold transition ${
+                active
+                  ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <span
+                className="h-4 w-6 border-2 border-current"
+                style={{ borderRadius: radius === 240 ? 999 : Math.min(10, radius / 3) }}
+              />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-gray-600">
+          <span>Radius</span>
+          <span className="rounded-md bg-gray-100 px-2 py-1">{Math.round(cornerRadius)} px</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="240"
+          step="1"
+          value={Math.min(240, cornerRadius)}
+          onChange={(event) =>
+            props.onCornerRadiusChange(Number(event.target.value))
+          }
+          className="w-full accent-violet-600"
+        />
+      </div>
+    </div>
   );
 
   const closeSheet = () => setMobileSheet(null);
@@ -420,17 +510,7 @@ export default function ContextToolbar(props: Props) {
               <button onClick={props.onStartCrop} className="rounded-lg border px-2.5 py-1.5">Crop</button>
               <button onClick={props.onFlipHorizontal} className="rounded-lg border px-2.5 py-1.5">Flip</button>
               <button onClick={() => props.onOpenPanel("imageEdit")} className="rounded-lg border px-2.5 py-1.5">Effects</button>
-              <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]" title="Corner rounding">
-                Corners
-                <input
-                  type="number"
-                  min="0"
-                  max="240"
-                  value={Math.round(cornerRadius)}
-                  onChange={(e) => props.onCornerRadiusChange(Number(e.target.value))}
-                  className="w-11 bg-transparent text-center text-xs outline-none"
-                />
-              </label>
+              {canRoundCorners && renderDesktopCorners()}
               <button onClick={props.onSetImageAsBackground} className="rounded-lg border px-2.5 py-1.5">Set BG</button>
             </>
           )}
@@ -440,19 +520,7 @@ export default function ContextToolbar(props: Props) {
               <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]">Fill<input type="color" value={shapeFill} onChange={(e) => props.onUpdate({ fill: e.target.value })} className="h-6 w-7" /></label>
               <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]">Border<input type="color" value={shapeStroke} onChange={(e) => props.onUpdate({ stroke: e.target.value })} className="h-6 w-7" /></label>
               <input type="number" min="0" max="30" value={selected.strokeWidth ?? 0} onChange={(e) => props.onUpdate({ strokeWidth: Number(e.target.value) })} className="w-14 rounded-lg border px-2 py-1.5 text-xs" title="Border width" />
-              {["rect", "rectangle"].includes(type) && (
-                <label className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px]" title="Corner rounding">
-                  Corners
-                  <input
-                    type="number"
-                    min="0"
-                    max="240"
-                    value={Math.round(cornerRadius)}
-                    onChange={(e) => props.onCornerRadiusChange(Number(e.target.value))}
-                    className="w-11 bg-transparent text-center text-xs outline-none"
-                  />
-                </label>
-              )}
+              {["rect", "rectangle"].includes(type) && renderDesktopCorners()}
               <button onClick={props.onFlipHorizontal} className="rounded-lg border px-2.5 py-1.5">Flip</button>
             </>
           )}
@@ -466,6 +534,8 @@ export default function ContextToolbar(props: Props) {
           <button onClick={props.onDuplicate} className="rounded-lg border px-2.5 py-1.5">Duplicate</button>
           <button onClick={props.onDelete} className="rounded-lg border px-2.5 py-1.5 text-red-600">Delete</button>
         </div>
+
+        {desktopCornersOpen && canRoundCorners && renderDesktopCornerDetails()}
       </div>
     </>
   );
