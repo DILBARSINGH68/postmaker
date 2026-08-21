@@ -171,13 +171,24 @@ async function saveAutosavePages(
   const serialized = JSON.stringify(pages);
   safeSet(ACTIVE_PAGE_KEY, String(Math.max(0, activePageIndex ?? 0)));
 
-  const indexedSaved = await idbSet(IDB_PAGES_KEY, serialized);
+  // Normal template/page JSON should be committed synchronously first.
+  // This makes refresh reliable even if the user refreshes immediately after
+  // an edit, while large image-heavy projects still fall back to IndexedDB.
+  if (serialized.length <= LOCAL_DESIGN_LIMIT) {
+    const localSaved = safeSet(PAGES_KEY, serialized);
 
-  if (indexedSaved) {
-    safeRemove(PAGES_KEY);
-    return;
+    if (localSaved) {
+      void idbDelete(IDB_PAGES_KEY);
+      return;
+    }
   }
 
+  safeRemove(PAGES_KEY);
+  const indexedSaved = await idbSet(IDB_PAGES_KEY, serialized);
+
+  if (indexedSaved) return;
+
+  // Last fallback for browsers where IndexedDB is unavailable.
   safeSet(PAGES_KEY, serialized);
 }
 

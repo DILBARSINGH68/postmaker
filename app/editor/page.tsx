@@ -272,6 +272,31 @@ export default function EditorPage() {
   const [editorReady, setEditorReady] = useState(false);
 
   const canvas = () => fabricRef.current;
+
+  // "new" and "template" are one-time launch parameters. If they remain
+  // in the URL, a browser refresh recreates/clears the design instead of
+  // restoring the latest autosave. Remove only those transient parameters.
+  const clearTransientEditorQuery = () => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    let changed = false;
+
+    ["new", "template"].forEach((key) => {
+      if (url.searchParams.has(key)) {
+        url.searchParams.delete(key);
+        changed = true;
+      }
+    });
+
+    if (!changed) return;
+
+    const search = url.searchParams.toString();
+    const nextUrl =
+      url.pathname + (search ? "?" + search : "") + url.hash;
+
+    window.history.replaceState(window.history.state, "", nextUrl);
+  };
   const refreshCloudProjects = async () => {
     const localProjects = loadProjects();
 
@@ -878,6 +903,41 @@ export default function EditorPage() {
   }, [designRevision, editorReady, background, format, projectName, activePageIndex, pages]);
 
   useEffect(() => {
+    if (!editorReady) return;
+
+    const flushAutosave = () => {
+      const c = canvas();
+      if (!c || restoringRef.current) return;
+
+      const pageSnapshot = snapshotAllPages(c);
+      const currentBackground =
+        typeof c.backgroundColor === "string" ? c.backgroundColor : background;
+
+      void saveAutosave(
+        JSON.stringify(c.toJSON()),
+        format,
+        currentBackground,
+        pageSnapshot,
+        activePageIndexRef.current
+      );
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushAutosave();
+      }
+    };
+
+    window.addEventListener("pagehide", flushAutosave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", flushAutosave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [editorReady, format, background, activePageIndex, pages, designRevision]);
+
+  useEffect(() => {
     const c = canvas();
     if (!c || !user || !editorReady || restoringRef.current || textEditingRef.current) return;
 
@@ -1389,6 +1449,21 @@ export default function EditorPage() {
       refreshObjects();
       updateHistoryButtons();
       initializeSinglePage(c);
+
+      const initialTemplatePages = snapshotAllPages(c);
+      commitPages(initialTemplatePages);
+      const initialTemplateBackground =
+        typeof c.backgroundColor === "string" ? c.backgroundColor : "#ffffff";
+
+      void saveAutosave(
+        JSON.stringify(c.toJSON()),
+        templateFormat || requestedFormat || FORMATS[0],
+        initialTemplateBackground,
+        initialTemplatePages,
+        activePageIndexRef.current
+      ).then((didSave) => setSaved(didSave));
+
+      clearTransientEditorQuery();
       setEditorReady(true);
       initialContentHandled = true;
     } else if (requestedNewDesign) {
@@ -1422,6 +1497,19 @@ export default function EditorPage() {
       refreshObjects();
       updateHistoryButtons();
       initializeSinglePage(c);
+
+      const initialBlankPages = snapshotAllPages(c);
+      commitPages(initialBlankPages);
+
+      void saveAutosave(
+        JSON.stringify(c.toJSON()),
+        requestedFormat || FORMATS[0],
+        "#ffffff",
+        initialBlankPages,
+        activePageIndexRef.current
+      ).then((didSave) => setSaved(didSave));
+
+      clearTransientEditorQuery();
       setEditorReady(true);
       initialContentHandled = true;
     }
@@ -1752,15 +1840,22 @@ export default function EditorPage() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      const commandKey = e.ctrlKey || e.metaKey;
+      const pressedKey = e.key.toLowerCase();
+
+      if (
+        commandKey &&
+        ((e.shiftKey && pressedKey === "z") ||
+          (!e.shiftKey && pressedKey === "y"))
+      ) {
         e.preventDefault();
-        void undo();
+        void redo();
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      if (commandKey && !e.shiftKey && pressedKey === "z") {
         e.preventDefault();
-        void redo();
+        void undo();
         return;
       }
 
@@ -4443,6 +4538,9 @@ export default function EditorPage() {
     setSelected(null);
     refreshObjects();
     updateHistoryButtons();
+    setSaved(false);
+    // Persist the undo result as the current design state.
+    setDesignRevision((revision) => revision + 1);
   };
 
   const redo = async () => {
@@ -4466,6 +4564,9 @@ export default function EditorPage() {
     setSelected(null);
     refreshObjects();
     updateHistoryButtons();
+    setSaved(false);
+    // Persist the redo result as the current design state.
+    setDesignRevision((revision) => revision + 1);
   };
 
   const fitZoomForFormat = (
@@ -4737,6 +4838,21 @@ export default function EditorPage() {
     setSelected(null);
     refreshObjects();
     saveHistory();
+
+    const immediateTemplatePages = snapshotAllPages(c);
+    commitPages(immediateTemplatePages);
+    const immediateTemplateBackground =
+      typeof c.backgroundColor === "string" ? c.backgroundColor : "#ffffff";
+
+    void saveAutosave(
+      JSON.stringify(c.toJSON()),
+      templateFormat || format,
+      immediateTemplateBackground,
+      immediateTemplatePages,
+      activePageIndexRef.current
+    ).then((didSave) => setSaved(didSave));
+
+    clearTransientEditorQuery();
   };
 
   const buildStructuredResume = async () => {
