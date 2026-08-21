@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import KriyavoLogo from "@/components/brand/KriyavoLogo";
+import PremiumButton from "@/components/billing/PremiumButton";
 import { useMemo, useState } from "react";
 
 import HomeSidebar from "@/components/home/HomeSidebar";
@@ -41,15 +42,16 @@ export default function Home() {
 
           <div className="relative mx-auto max-w-7xl">
             <div className="flex items-center justify-between py-3">
-              <div className="kriyavo-home-desktop-brand hidden items-center md:flex">
+              <Link href="/" className="kriyavo-home-desktop-brand hidden items-center md:flex" aria-label="Kriyavo home">
                 <KriyavoLogo variant="full" className="h-8 w-auto max-w-[150px]" />
-              </div>
-              <div className="flex items-center md:hidden">
+              </Link>
+              <Link href="/" className="flex items-center md:hidden" aria-label="Kriyavo home">
                 <KriyavoLogo variant="full" className="h-9 w-auto max-w-[150px]" />
-              </div>
+              </Link>
 
               <div className="ml-auto flex items-center gap-2">
-                <AuthButton />
+                <PremiumButton />
+                <AuthButton hideWhenAuthenticated />
                 <Link
                   href="/editor?new=1"
                   className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-violet-100 backdrop-blur hover:bg-white"

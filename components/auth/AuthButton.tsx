@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 
+type Props = {
+  hideWhenAuthenticated?: boolean;
+};
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -14,7 +18,7 @@ function initials(name: string) {
     .join("") || "U";
 }
 
-export default function AuthButton() {
+export default function AuthButton({ hideWhenAuthenticated = false }: Props) {
   const { configured, loading, user, openAuth, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +32,7 @@ export default function AuthButton() {
   }, []);
 
   if (loading) {
-    return <div className="h-9 w-24 animate-pulse rounded-full bg-white/60" />;
+    return hideWhenAuthenticated ? null : <div className="h-9 w-24 animate-pulse rounded-full bg-white/60" />;
   }
 
   if (!user) {
@@ -44,6 +48,8 @@ export default function AuthButton() {
       </div>
     );
   }
+
+  if (hideWhenAuthenticated) return null;
 
   const displayName =
     (user.user_metadata?.full_name as string | undefined) ||
@@ -71,7 +77,7 @@ export default function AuthButton() {
             <div className="mt-0.5 truncate text-xs text-slate-400">{user.email}</div>
           </div>
           <div className="my-1 h-px bg-slate-100" />
-          <Link href="/editor" onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-slate-700 hover:bg-slate-50">Your designs</Link>
+          <Link href="/#projects" onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-slate-700 hover:bg-slate-50">Your designs</Link>
           <Link href="/editor?new=1" onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-slate-700 hover:bg-slate-50">Create design</Link>
           <button type="button" onClick={async () => { setOpen(false); await signOut(); }} className="w-full rounded-xl px-3 py-2.5 text-left font-semibold text-rose-600 hover:bg-rose-50">Log out</button>
         </div>

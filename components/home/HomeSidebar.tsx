@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import KriyavoLogo from "@/components/brand/KriyavoLogo";
+import SidebarAccount from "@/components/auth/SidebarAccount";
 
 const NAV = [
   { label: "Home", icon: Home, href: "/" },
@@ -29,7 +30,8 @@ export default function HomeSidebar() {
       <Link
         href="/"
         className="mb-3 flex h-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200"
-        title="Kriyavo"
+        title="Kriyavo Home"
+        aria-label="Go to Kriyavo home"
       >
         <KriyavoLogo variant="mark" className="h-9 w-9" />
       </Link>
@@ -54,8 +56,8 @@ export default function HomeSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto flex justify-center pb-1">
-        <KriyavoLogo variant="mark" className="h-7 w-7 opacity-90" />
+      <div className="mt-auto flex justify-center border-t border-slate-100 pt-2">
+        <SidebarAccount />
       </div>
     </aside>
   );
