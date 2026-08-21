@@ -74,7 +74,7 @@ export default function BrandKitPanel(props: Props) {
           Keep every design on-brand
         </div>
         <div className="mt-1 text-xs leading-5 text-white/80">
-          Save your logo, palette and fonts. Apply them to any PostMaker design in one click.
+          Save your logo, palette and fonts. Apply them to any Kriyavo design in one click.
         </div>
       </div>
 
@@ -288,7 +288,7 @@ export default function BrandKitPanel(props: Props) {
                     className="rounded-md px-1.5 py-1 text-[10px] text-red-500 hover:bg-red-50"
                     title="Remove logo"
                   >
-                    ✕
+                    âœ•
                   </button>
                 </div>
               </div>

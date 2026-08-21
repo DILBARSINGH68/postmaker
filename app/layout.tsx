@@ -4,9 +4,8 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PostMaker â€” Social Posts & Resume Maker",
-  description:
-    "Create social media graphics, thumbnails and editable professional resumes with PostMaker.",
+  title: "Kriyavo - Create, Design, Share & Grow",
+  description: "Create social posts, festival designs, resumes and more with Kriyavo.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import KriyavoLogo from "@/components/brand/KriyavoLogo";
 import { useMemo, useState } from "react";
 
 import HomeSidebar from "@/components/home/HomeSidebar";
@@ -36,15 +37,15 @@ export default function Home() {
 
       <div className="md:pl-[74px]">
         <section className="relative overflow-hidden px-4 pb-10 pt-4 md:px-8">
-          <div className="absolute inset-x-4 top-4 h-[340px] rounded-[32px] bg-gradient-to-br from-cyan-100 via-white to-violet-200 md:inset-x-8" />
+          <div className="absolute inset-x-4 top-4 h-[340px] rounded-[32px] bg-gradient-to-br from-blue-100 via-white to-fuchsia-100 md:inset-x-8" />
 
           <div className="relative mx-auto max-w-7xl">
             <div className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3 md:hidden">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-600 font-black text-white">
-                  P
-                </div>
-                <div className="font-bold">PostMaker</div>
+              <div className="kriyavo-home-desktop-brand hidden items-center md:flex">
+                <KriyavoLogo variant="full" className="h-8 w-auto max-w-[150px]" />
+              </div>
+              <div className="flex items-center md:hidden">
+                <KriyavoLogo variant="full" className="h-9 w-auto max-w-[150px]" />
               </div>
 
               <div className="ml-auto flex items-center gap-2">
@@ -56,8 +57,8 @@ export default function Home() {
                   Create design
                 </Link>
 
-                <div className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-200">
-                  Free â€¢ No watermark
+                <div className="rounded-full bg-gradient-to-r from-[#7A3CFF] via-[#FF2EA6] to-[#FF8A00] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-200">
+                  Free Ã¢â‚¬Â¢ No watermark
                 </div>
               </div>
             </div>
@@ -67,7 +68,7 @@ export default function Home() {
                 Social posts + resumes in one clean workspace
               </div>
 
-              <h1 className="mx-auto max-w-4xl bg-gradient-to-r from-sky-600 via-violet-600 to-fuchsia-600 bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-6xl">
+              <h1 className="mx-auto max-w-4xl bg-gradient-to-r from-[#246CFF] via-[#7A3CFF] to-[#FF2EA6] bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-6xl">
                 What will you create today?
               </h1>
 
@@ -77,7 +78,7 @@ export default function Home() {
               </p>
 
               <div className="mx-auto mt-7 flex max-w-3xl items-center gap-3 rounded-2xl border border-violet-300 bg-white px-4 py-4 shadow-xl shadow-violet-100/70">
-                <span className="text-xl text-slate-400">âŒ•</span>
+                <span className="text-xl text-slate-400">Ã¢Å’â€¢</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -128,7 +129,7 @@ export default function Home() {
               </div>
 
               <a href="#templates" className="text-sm font-semibold text-violet-600">
-                See templates â†’
+                See templates Ã¢â€ â€™
               </a>
             </div>
 
@@ -165,7 +166,7 @@ export default function Home() {
                     </p>
 
                     <div className="mt-5 text-sm font-semibold">
-                      Start creating â†’
+                      Start creating Ã¢â€ â€™
                     </div>
                   </div>
                 </Link>
@@ -357,7 +358,7 @@ export default function Home() {
               </div>
 
               <Link href="/editor" className="text-sm font-semibold text-violet-600">
-                Open projects â†’
+                Open projects Ã¢â€ â€™
               </Link>
             </div>
 
@@ -368,7 +369,7 @@ export default function Home() {
             <div className="grid items-center gap-8 md:grid-cols-[1.3fr_1fr]">
               <div>
                 <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-                  PostMaker
+                  Kriyavo
                 </div>
 
                 <h2 className="mt-4 max-w-2xl text-3xl font-black md:text-5xl">
@@ -377,7 +378,7 @@ export default function Home() {
 
                 <p className="mt-4 max-w-xl text-sm leading-6 text-slate-400">
                   A focused design app for social media creators, small businesses,
-                  students and job seekers â€” without the clutter.
+                  students and job seekers Ã¢â‚¬â€ without the clutter.
                 </p>
 
                 <Link
@@ -392,7 +393,7 @@ export default function Home() {
                 {[
                   ["100+", "Social templates"],
                   ["50+", "Resume templates"],
-                  ["0â‚¹", "Core editor"],
+                  ["0Ã¢â€šÂ¹", "Core editor"],
                   ["No", "Watermark"],
                 ].map(([value, label]) => (
                   <div
@@ -409,6 +410,12 @@ export default function Home() {
         </div>
       </div>
 
+      <footer className="kriyavo-site-footer mx-auto max-w-7xl px-4 pb-24 md:pl-8 md:pr-8 md:pb-8">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <KriyavoLogo variant="tagline" className="h-8 w-auto max-w-[190px]" />
+          <div className="text-[11px] text-slate-400">(c) 2026 Kriyavo. Create - Design - Share - Grow.</div>
+        </div>
+      </footer>
       <MobileBottomNav />
     </main>
   );

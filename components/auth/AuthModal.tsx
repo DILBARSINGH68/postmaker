@@ -1,5 +1,7 @@
 "use client";
 
+import KriyavoLogo from "@/components/brand/KriyavoLogo";
+
 import { useEffect, useState, type FormEvent } from "react";
 
 import { getSupabase, isSupabaseConfigured } from "@/lib/auth/supabase";
@@ -128,7 +130,7 @@ export default function AuthModal({ open, mode: initialMode, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center md:items-center md:p-6" role="dialog" aria-modal="true" aria-label="PostMaker account">
+    <div className="fixed inset-0 z-[200] flex items-end justify-center md:items-center md:p-6" role="dialog" aria-modal="true" aria-label="Kriyavo account">
       <button type="button" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]" onClick={onClose} aria-label="Close" />
 
       <div className="relative w-full rounded-t-[28px] bg-white p-5 shadow-2xl md:max-w-md md:rounded-[28px] md:p-7">
@@ -136,18 +138,14 @@ export default function AuthModal({ open, mode: initialMode, onClose }: Props) {
 
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 text-sm font-black text-white">P</div>
-              <div>
-                <div className="text-sm font-black text-slate-900">PostMaker</div>
-                <div className="text-[11px] text-slate-400">Create. Save. Access anywhere.</div>
-              </div>
+            <div className="flex items-center gap-3">
+              <KriyavoLogo variant="full" className="h-9 w-auto max-w-[145px]" />
             </div>
             <h2 className="mt-5 text-2xl font-black tracking-tight text-slate-950">
               {mode === "signin" ? "Welcome back" : "Create your account"}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600 hover:bg-slate-200" aria-label="Close">✕</button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600 hover:bg-slate-200" aria-label="Close">âœ•</button>
         </div>
 
         {!isSupabaseConfigured && (
@@ -191,7 +189,7 @@ export default function AuthModal({ open, mode: initialMode, onClose }: Props) {
           {error && <div className="rounded-xl bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">{error}</div>}
           {message && <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-700">{message}</div>}
 
-          <button type="submit" disabled={busy || !isSupabaseConfigured} className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-100 disabled:opacity-50">
+          <button type="submit" disabled={busy || !isSupabaseConfigured} className="h-11 w-full rounded-xl bg-gradient-to-r from-[#7A3CFF] via-[#FF2EA6] to-[#FF8A00] text-sm font-black text-white shadow-lg shadow-violet-100 disabled:opacity-50">
             {busy ? "Please wait..." : mode === "signin" ? "Continue" : "Create account"}
           </button>
         </form>
@@ -203,7 +201,7 @@ export default function AuthModal({ open, mode: initialMode, onClose }: Props) {
         )}
 
         <div className="mt-5 text-center text-xs text-slate-500">
-          {mode === "signin" ? "New to PostMaker?" : "Already have an account?"}{" "}
+          {mode === "signin" ? "New to Kriyavo?" : "Already have an account?"}{" "}
           <button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }} className="font-bold text-violet-600">
             {mode === "signin" ? "Sign up" : "Sign in"}
           </button>

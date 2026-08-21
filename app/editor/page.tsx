@@ -17,7 +17,7 @@ import {
 } from "fabric";
 
 // Fabric 7 changed object origins to center/center by default.
-// PostMaker's editor and template coordinates are authored from the
+// Kriyavo's editor and template coordinates are authored from the
 // top-left corner, so keep one coordinate convention everywhere.
 BaseFabricObject.ownDefaults.originX = "left";
 BaseFabricObject.ownDefaults.originY = "top";
@@ -53,6 +53,7 @@ FabricObject.customProperties = Array.from(
   ])
 );
 
+import { useAuth } from "@/components/auth/AuthProvider";
 import EditorHeader from "@/components/editor/EditorHeader";
 import LeftRail from "@/components/editor/LeftRail";
 import SidePanel from "@/components/editor/SidePanel";
@@ -106,6 +107,15 @@ import {
   saveAutosave,
   saveProjects,
 } from "@/lib/editor/storage";
+import {
+  deleteCloudProject,
+  getCurrentCloudDesignId,
+  listCloudProjects,
+  mergeProjectLists,
+  resetCurrentCloudDesignId,
+  saveCloudProject,
+  setCurrentCloudDesignId,
+} from "@/lib/editor/cloudStorage";
 
 import type {
   DesignPage,
@@ -201,6 +211,7 @@ const isBrandNearBlack = (value: unknown) => {
 };
 
 export default function EditorPage() {
+  const { user } = useAuth();
   const canvasElementRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
 
@@ -257,6 +268,40 @@ export default function EditorPage() {
   });
 
   const canvas = () => fabricRef.current;
+  const refreshCloudProjects = async () => {
+    const localProjects = loadProjects();
+
+    if (!user) {
+      setProjects(localProjects);
+      return;
+    }
+
+    const cloudProjects = await listCloudProjects(user.id);
+    setProjects(mergeProjectLists(localProjects, cloudProjects));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refresh = async () => {
+      const localProjects = loadProjects();
+      if (!user) {
+        if (!cancelled) setProjects(localProjects);
+        return;
+      }
+
+      const cloudProjects = await listCloudProjects(user.id);
+      if (!cancelled) {
+        setProjects(mergeProjectLists(localProjects, cloudProjects));
+      }
+    };
+
+    void refresh();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, showProjects]);
 
   const makePageId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1178,6 +1223,9 @@ export default function EditorPage() {
     const requestedTemplate = params.get("template");
     const requestedPanel = params.get("panel");
     const requestedNewDesign = params.get("new") === "1";
+    if (user && (requestedNewDesign || requestedTemplate)) {
+      resetCurrentCloudDesignId(user.id);
+    }
 
     if (requestedPanel === "festival" || requestedPanel === "templates") {
       setActivePanel(requestedPanel);
@@ -3443,7 +3491,7 @@ export default function EditorPage() {
       lines.length > 0 &&
       lines.every((line) =>
         line.trimStart().startsWith(
-          "â€¢ "
+          "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ "
         )
       );
 
@@ -3451,14 +3499,14 @@ export default function EditorPage() {
       ? lines
           .map((line) =>
             line.replace(
-              /^\s*â€¢\s*/,
+              /^\s*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢\s*/,
               ""
             )
           )
           .join("\n")
       : lines
           .map(
-            (line) => `â€¢ ${line}`
+            (line) => `ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${line}`
           )
           .join("\n");
 
@@ -3479,7 +3527,7 @@ export default function EditorPage() {
     name: string
   ) => {
     window.alert(
-      `${name} AI/backend feature hai. Static â‚¹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
+      `${name} AI/backend feature hai. Static ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
     );
   };
 
@@ -3923,7 +3971,7 @@ export default function EditorPage() {
 
     const link = document.createElement("a");
     link.href = data;
-    link.download = "postmaker-selection.png";
+    link.download = "kriyavo-selection.png";
     link.click();
 
     setContextMenu(null);
@@ -3941,8 +3989,8 @@ export default function EditorPage() {
       [
         `Type: ${String(obj.type || "object")}`,
         `Position: ${Math.round(box.left)}, ${Math.round(box.top)}`,
-        `Size: ${Math.round(box.width)} Ã— ${Math.round(box.height)}`,
-        `Rotation: ${Math.round(obj.angle || 0)}Â°`,
+        `Size: ${Math.round(box.width)} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${Math.round(box.height)}`,
+        `Rotation: ${Math.round(obj.angle || 0)}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°`,
         `Opacity: ${Math.round((obj.opacity ?? 1) * 100)}%`,
       ].join("\n")
     );
@@ -5035,9 +5083,9 @@ export default function EditorPage() {
         await navigator.share({
           title:
             projectName.trim() ||
-            "PostMaker design",
+            "Kriyavo design",
           text:
-            "Created with PostMaker",
+            "Created with Kriyavo",
           files: [file],
         });
 
@@ -5065,7 +5113,7 @@ export default function EditorPage() {
     }
   };
 
-  const saveProject = () => {
+  const saveProject = async () => {
     const c = canvas();
     if (!c) return;
 
@@ -5089,8 +5137,13 @@ export default function EditorPage() {
       updatedAt: Date.now(),
     };
 
-    const updated = [project, ...projects];
-    const didSave = saveProjects(updated);
+    const localProjects = loadProjects();
+    const updatedLocal = [
+      project,
+      ...localProjects.filter((item) => item.id !== project.id),
+    ];
+    const updated = [project, ...projects.filter((item) => item.id !== project.id)];
+    const didSave = saveProjects(updatedLocal);
 
     if (!didSave) {
       window.alert(
@@ -5100,6 +5153,13 @@ export default function EditorPage() {
     }
 
     setProjects(updated);
+
+    if (user) {
+      setCurrentCloudDesignId(user.id, project.id);
+      await saveCloudProject(user.id, project);
+      await refreshCloudProjects();
+    }
+
     setSaved(true);
   };
 
@@ -5135,9 +5195,13 @@ export default function EditorPage() {
   };
 
   const deleteProject = (id: string) => {
-    const updated = projects.filter((project) => project.id !== id);
-    setProjects(updated);
-    saveProjects(updated);
+    const localUpdated = loadProjects().filter((project) => project.id !== id);
+    saveProjects(localUpdated);
+    setProjects((current) => current.filter((project) => project.id !== id));
+
+    if (user) {
+      void deleteCloudProject(user.id, id);
+    }
   };
 
   const selectLayer = (object: FabricObject) => {
@@ -5367,7 +5431,7 @@ export default function EditorPage() {
 
           {cropMode && (
             <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
-              Crop mode Â· image drag karo Â· ratio choose karo Â· Done
+              Crop mode ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· image drag karo ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ratio choose karo ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Done
             </div>
           )}
 

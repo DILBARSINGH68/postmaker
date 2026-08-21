@@ -1,3 +1,4 @@
+import KriyavoLogo from "@/components/brand/KriyavoLogo";
 import type { ReactNode } from "react";
 import type { EditorPanel } from "@/types/editor";
 

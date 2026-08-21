@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import KriyavoLogo from "@/components/brand/KriyavoLogo";
 
 const NAV = [
-  { label: "Home", icon: "⌂", href: "/" },
+  { label: "Home", icon: "âŒ‚", href: "/" },
   { label: "Create", icon: "+", href: "/editor?new=1" },
-  { label: "Social", icon: "◎", href: "/editor?new=1" },
-  { label: "Festival", icon: "✦", href: "/editor?format=Festival%20Poster&panel=festival&new=1" },
-  { label: "Resume", icon: "▤", href: "/editor?format=A4%20Portrait&new=1" },
-  { label: "Templates", icon: "▦", href: "#templates" },
-  { label: "Projects", icon: "□", href: "#projects" },
+  { label: "Social", icon: "â—Ž", href: "/editor?new=1" },
+  { label: "Festival", icon: "âœ¦", href: "/editor?format=Festival%20Poster&panel=festival&new=1" },
+  { label: "Resume", icon: "â–¤", href: "/editor?format=A4%20Portrait&new=1" },
+  { label: "Templates", icon: "â–¦", href: "#templates" },
+  { label: "Projects", icon: "â–¡", href: "#projects" },
 ];
 
 export default function HomeSidebar() {
@@ -17,10 +18,10 @@ export default function HomeSidebar() {
     <aside className="fixed inset-y-0 left-0 z-50 hidden w-[74px] flex-col border-r border-violet-100 bg-white/95 px-2 py-3 backdrop-blur md:flex">
       <Link
         href="/"
-        className="mb-4 flex h-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-600 text-lg font-black text-white shadow-lg shadow-violet-200"
-        title="PostMaker"
+        className="mb-4 flex h-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
+        title="Kriyavo"
       >
-        P
+        <KriyavoLogo variant="mark" className="h-10 w-10" />
       </Link>
 
       <nav className="space-y-1">
@@ -40,10 +41,8 @@ export default function HomeSidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-          PM
-        </div>
+      <div className="mt-auto flex justify-center">
+        <KriyavoLogo variant="mark" className="h-8 w-8 opacity-90" />
       </div>
     </aside>
   );

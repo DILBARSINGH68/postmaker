@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import KriyavoLogo from "@/components/brand/KriyavoLogo";
 import { useState, type ReactNode } from "react";
 
 import type { Format } from "@/types/editor";
@@ -61,12 +62,11 @@ export default function EditorHeader(props: Props) {
               className="rounded-lg px-3 py-2 hover:bg-gray-100"
               title="Back"
             >
-              ←
+              â†
             </button>
 
-            <div className="hidden md:block">
-              <div className="text-sm font-semibold">PostMaker</div>
-              <div className="text-[9px] font-medium text-violet-500">Design editor</div>
+            <div className="hidden md:flex items-center">
+              <KriyavoLogo variant="full" className="h-7 w-auto max-w-[128px]" />
             </div>
 
             <input
@@ -92,10 +92,10 @@ export default function EditorHeader(props: Props) {
               Save
             </button>
             <button onClick={props.onUndo} disabled={!props.canUndo} className="rounded-lg border px-3 py-2 disabled:opacity-30" title="Undo">
-              ↶
+              â†¶
             </button>
             <button onClick={props.onRedo} disabled={!props.canRedo} className="rounded-lg border px-3 py-2 disabled:opacity-30" title="Redo">
-              ↷
+              â†·
             </button>
             <button onClick={props.onShare} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50">
               Share
@@ -106,7 +106,8 @@ export default function EditorHeader(props: Props) {
           </div>
         </div>
 
-        <div className="flex h-full items-center justify-between bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-600 px-2 md:hidden">
+        <div className="flex h-full items-center justify-between bg-gradient-to-r from-[#246CFF] via-[#7A3CFF] to-[#FF2EA6] px-2 md:hidden">
+          <KriyavoLogo variant="mark" className="kriyavo-mobile-editor-mark pointer-events-none absolute left-1/2 h-8 w-8 -translate-x-1/2 drop-shadow-sm" />
           <div className="flex items-center gap-0.5">
             <IconButton label="Home" onClick={props.onBack}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
@@ -173,11 +174,11 @@ export default function EditorHeader(props: Props) {
                   aria-label="Design name"
                 />
                 <div className="mt-1 text-xs text-gray-500">
-                  {props.format.name} • {props.format.width}px × {props.format.height}px • {Math.max(1, props.pageCount)} page{props.pageCount === 1 ? "" : "s"}
+                  {props.format.name} â€¢ {props.format.width}px Ã— {props.format.height}px â€¢ {Math.max(1, props.pageCount)} page{props.pageCount === 1 ? "" : "s"}
                 </div>
               </div>
               <button onClick={() => setShowMobileDetails(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm" aria-label="Close">
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -187,23 +188,23 @@ export default function EditorHeader(props: Props) {
                 <span className="text-gray-500">Editing</span>
               </div>
               <button onClick={() => { setShowMobileDetails(false); props.onResize(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">↔</span><span>Resize design</span>
+                <span className="text-lg">â†”</span><span>Resize design</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onProjects(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">▦</span><span>View your designs</span>
+                <span className="text-lg">â–¦</span><span>View your designs</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onSave(); }} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="flex items-center gap-3"><span className="text-lg">✓</span><span>Save</span></span>
+                <span className="flex items-center gap-3"><span className="text-lg">âœ“</span><span>Save</span></span>
                 <span className="text-xs text-gray-400">{props.saved ? "All changes saved" : "Saving..."}</span>
               </button>
               <Link href="/editor?new=1" className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-gray-50">
-                <span className="text-lg">＋</span><span>Create new design</span>
+                <span className="text-lg">ï¼‹</span><span>Create new design</span>
               </Link>
               <button onClick={() => { setShowMobileDetails(false); props.onDownload(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">↓</span><span>Download</span>
+                <span className="text-lg">â†“</span><span>Download</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onShare(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">↗</span><span>Share</span>
+                <span className="text-lg">â†—</span><span>Share</span>
               </button>
             </div>
           </div>
