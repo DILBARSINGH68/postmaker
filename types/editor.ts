@@ -69,6 +69,7 @@ export type SelectedSnapshot = {
   opacity?: number;
   rx?: number;
   ry?: number;
+  cornerRadius?: number;
   selectable?: boolean;
   visible?: boolean;
   flipX?: boolean;

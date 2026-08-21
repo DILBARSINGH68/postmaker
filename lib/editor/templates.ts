@@ -11,6 +11,11 @@ import type { Format } from "@/types/editor";
 import { FESTIVALS } from "@/lib/editor/festivals";
 import { getSocialTemplateImage } from "@/lib/editor/templateImages";
 import {
+  FLAGSHIP_TEMPLATE_DEFINITIONS,
+  applyFlagshipTemplate,
+  isFlagshipTemplate,
+} from "@/lib/editor/flagshipTemplates";
+import {
   PREMIUM_TEMPLATE_DEFINITIONS,
   applyPremiumTemplate,
   isPremiumTemplate,
@@ -417,6 +422,7 @@ const LETTER_RESUME_DEFINITIONS: TemplateDefinition[] =
   );
 
 const DEFINITIONS = [
+  ...FLAGSHIP_TEMPLATE_DEFINITIONS,
   ...PREMIUM_TEMPLATE_DEFINITIONS,
   ...SOCIAL_DEFINITIONS,
   ...EXTRA_SOCIAL_DEFINITIONS,
@@ -3447,6 +3453,11 @@ export function applyTemplate(
 
   (canvas as any).__postMakerTemplateToken =
     renderToken;
+
+  if (isFlagshipTemplate(type)) {
+    applyFlagshipTemplate(canvas, type, renderToken);
+    return;
+  }
 
   if (isPremiumTemplate(type)) {
     applyPremiumTemplate(canvas, type, renderToken);

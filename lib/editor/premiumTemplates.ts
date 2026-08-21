@@ -736,7 +736,7 @@ function photo(
   fallback: string,
   border?: string
 ) {
-  rect(canvas, x, y, width, height, fallback, radius, {
+  const slot = rect(canvas, x, y, width, height, fallback, radius, {
     stroke: border || "transparent",
     strokeWidth: border ? Math.max(2, Math.min(width, height) * 0.01) : 0,
   });
@@ -765,6 +765,20 @@ function photo(
         cropY = (sourceH - cropH) / 2;
       }
 
+      const localRadius = Math.max(
+        0,
+        Math.min(radius, Math.min(cropW, cropH) / 2)
+      );
+
+      const clipPath = new Rect({
+        width: cropW,
+        height: cropH,
+        rx: localRadius,
+        ry: localRadius,
+        originX: "center",
+        originY: "center",
+      });
+
       image.set({
         left: x,
         top: y,
@@ -776,12 +790,22 @@ function photo(
         scaleY: height / cropH,
         originX: "left",
         originY: "top",
+        clipPath,
       });
 
       (image as any).templateImage = true;
       (image as any).templateImageUrl = imageUrl;
+      (image as any).cornerRadius = localRadius;
       image.setCoords();
+
+      const slotIndex = canvas.getObjects().indexOf(slot);
       canvas.add(image);
+      if (
+        slotIndex >= 0 &&
+        typeof (canvas as any).moveObjectTo === "function"
+      ) {
+        (canvas as any).moveObjectTo(image, slotIndex + 1);
+      }
       canvas.requestRenderAll();
     })
     .catch(() => {

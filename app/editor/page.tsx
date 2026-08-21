@@ -44,6 +44,9 @@ const fabricCustomProperties = [
   "smartFrameBorderColor",
   "smartFrameBorderWidth",
   "smartFrameRole",
+  "cornerRadius",
+  "templateImage",
+  "templateImageUrl",
 ];
 
 FabricObject.customProperties = Array.from(
@@ -454,6 +457,46 @@ export default function EditorPage() {
     });
   };
 
+  const syncImageCornerClip = (object: FabricObject | FabricImage) => {
+    const anyObject = object as any;
+    const type = String(
+      anyObject.type || anyObject.constructor?.name || ""
+    ).toLowerCase();
+
+    if (!["image", "fabricimage"].includes(type)) return;
+
+    const width = Math.max(1, Number(anyObject.width || 1));
+    const height = Math.max(1, Number(anyObject.height || 1));
+    const requested = Number(
+      anyObject.cornerRadius ?? anyObject.clipPath?.rx ?? 0
+    );
+    const radius = Math.max(
+      0,
+      Math.min(
+        Number.isFinite(requested) ? requested : 0,
+        Math.min(width, height) / 2
+      )
+    );
+
+    anyObject.cornerRadius = radius;
+
+    if (radius <= 0) {
+      anyObject.clipPath = undefined;
+      anyObject.dirty = true;
+      return;
+    }
+
+    anyObject.clipPath = new Rect({
+      width,
+      height,
+      rx: radius,
+      ry: radius,
+      originX: "center",
+      originY: "center",
+    });
+    anyObject.dirty = true;
+  };
+
   const normalizeLoadedObjectOrigins = (c: Canvas) => {
     c.getObjects().forEach((obj) => {
       const topLeft = obj.getPositionByOrigin(
@@ -468,6 +511,7 @@ export default function EditorPage() {
         top: topLeft.y,
       });
 
+      syncImageCornerClip(obj);
       obj.setCoords();
     });
 
@@ -719,6 +763,12 @@ export default function EditorPage() {
       opacity: obj.opacity ?? 1,
       rx: obj.rx ?? 0,
       ry: obj.ry ?? 0,
+      cornerRadius: Number(
+        obj.cornerRadius ??
+          obj.clipPath?.rx ??
+          obj.rx ??
+          0
+      ),
       selectable: obj.selectable,
       visible: obj.visible,
       flipX: obj.flipX ?? false,
@@ -1269,6 +1319,26 @@ export default function EditorPage() {
       session.startCropY = session.object.cropY || 0;
     };
 
+    const objectAdded = (opt: any) => {
+      refreshObjects();
+
+      const target = opt?.target as any;
+      if (
+        target?.templateImage &&
+        !restoringRef.current &&
+        !cropSessionRef.current
+      ) {
+        // Remote template photos load asynchronously. Save exactly when the
+        // real image arrives so refresh/cloud autosave never falls back to
+        // the placeholder-only composition.
+        saveHistory();
+      }
+    };
+
+    const objectRemoved = () => {
+      refreshObjects();
+    };
+
     c.on("selection:created", updateSelection);
     c.on("selection:updated", updateSelection);
     c.on("selection:cleared", clearSelection);
@@ -1277,8 +1347,8 @@ export default function EditorPage() {
     c.on("text:editing:entered", textEditingEntered);
     c.on("text:changed", textChanged);
     c.on("text:editing:exited", textEditingExited);
-    c.on("object:added", refreshObjects);
-    c.on("object:removed", refreshObjects);
+    c.on("object:added", objectAdded);
+    c.on("object:removed", objectRemoved);
     c.on("mouse:down", cropMouseDown);
     c.on("object:moving", cropMoving);
     c.on("object:moving", smartSnapMoving);
@@ -1604,6 +1674,8 @@ export default function EditorPage() {
       c.off("text:editing:entered", textEditingEntered);
       c.off("text:changed", textChanged);
       c.off("text:editing:exited", textEditingExited);
+      c.off("object:added", objectAdded);
+      c.off("object:removed", objectRemoved);
       c.off("mouse:down", rememberRightClickTarget);
       c.off("mouse:down", cropMouseDown);
       c.off("object:moving", cropMoving);
@@ -2873,6 +2945,7 @@ export default function EditorPage() {
         obj as FabricImage
       ).setSrc(reader.result);
 
+      syncImageCornerClip(obj as FabricImage);
       obj.setCoords();
       c.renderAll();
 
@@ -3794,6 +3867,38 @@ export default function EditorPage() {
     saveHistory();
   };
 
+  const setSelectedCornerRadius = (value: number) => {
+    const c = canvas();
+    const obj = c?.getActiveObject();
+
+    if (!c || !obj) return;
+
+    const type = String(
+      obj.type || obj.constructor?.name || ""
+    ).toLowerCase();
+    const radius = Math.max(
+      0,
+      Math.min(500, Number.isFinite(value) ? value : 0)
+    );
+
+    if (["rect", "rectangle"].includes(type)) {
+      (obj as any).set({
+        rx: radius,
+        ry: radius,
+      });
+    } else if (["image", "fabricimage"].includes(type)) {
+      (obj as any).cornerRadius = radius;
+      syncImageCornerClip(obj as FabricImage);
+    } else {
+      return;
+    }
+
+    obj.setCoords();
+    c.requestRenderAll();
+    setSelected(snapshotObject(obj));
+    saveHistory();
+  };
+
   const startInteractiveCrop = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
@@ -3873,6 +3978,7 @@ export default function EditorPage() {
         scaleY: visualHeight / cropHeight,
       });
 
+      syncImageCornerClip(img);
       img.setPositionByOrigin(center as any, "center", "center");
       img.setCoords();
 
@@ -3940,6 +4046,7 @@ export default function EditorPage() {
       lockRotation: session.original.lockRotation,
     });
 
+    syncImageCornerClip(session.object);
     session.object.setCoords();
     c.setActiveObject(session.object);
     c.renderAll();
@@ -4268,6 +4375,7 @@ export default function EditorPage() {
       height: cropHeight,
     });
 
+    syncImageCornerClip(img);
     img.setPositionByOrigin(center as any, "center", "center");
     img.setCoords();
 
@@ -4325,6 +4433,7 @@ export default function EditorPage() {
       height: sourceHeight,
     });
 
+    syncImageCornerClip(img);
     img.setPositionByOrigin(center as any, "center", "center");
     img.setCoords();
 
@@ -5656,6 +5765,7 @@ export default function EditorPage() {
             onOpenPanel={(panel) => setActivePanel(panel)}
             onSetImageAsBackground={setImageAsBackground}
             onStartCrop={startInteractiveCrop}
+            onCornerRadiusChange={setSelectedCornerRadius}
             onToggleBullets={toggleBulletList}
             onOpenPosition={() => setShowPosition(true)}
             onGroup={groupSelected}

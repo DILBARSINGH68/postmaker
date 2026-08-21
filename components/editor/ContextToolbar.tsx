@@ -20,6 +20,7 @@ type Props = {
   onOpenPanel: (panel: Exclude<EditorPanel, null>) => void;
   onSetImageAsBackground: () => void;
   onStartCrop: () => void;
+  onCornerRadiusChange: (value: number) => void;
   onToggleBullets: () => void;
   onOpenPosition: () => void;
   onGroup: () => void;
@@ -37,6 +38,7 @@ type MobileSheet =
   | "align"
   | "fill"
   | "border"
+  | "corners"
   | "opacity"
   | "position"
   | "more"
@@ -87,6 +89,13 @@ export default function ContextToolbar(props: Props) {
   const textColor = typeof selected.fill === "string" ? selected.fill : "#111111";
   const shapeFill = typeof selected.fill === "string" ? selected.fill : "#111111";
   const shapeStroke = typeof selected.stroke === "string" ? selected.stroke : "#111111";
+  const canRoundCorners =
+    (isImage && !isMockup && !isSmartFrame) ||
+    ["rect", "rectangle"].includes(type);
+  const cornerRadius = Math.max(
+    0,
+    Number(selected.cornerRadius ?? selected.rx ?? 0)
+  );
 
   const closeSheet = () => setMobileSheet(null);
   const openEditorPanel = (panel: Exclude<EditorPanel, null>) => {
@@ -103,6 +112,7 @@ export default function ContextToolbar(props: Props) {
     align: "Alignment",
     fill: "Fill color",
     border: "Border",
+    corners: "Corners",
     opacity: "Transparency",
     position: "Position",
     more: "More",
@@ -220,6 +230,48 @@ export default function ContextToolbar(props: Props) {
             </div>
           )}
 
+          {mobileSheet === "corners" && canRoundCorners && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 8, 16, 24, 32, 48, 96].map((radius) => (
+                  <SheetButton
+                    key={radius}
+                    active={Math.round(cornerRadius) === radius}
+                    onClick={() => props.onCornerRadiusChange(radius)}
+                  >
+                    {radius === 0 ? "Square" : radius}
+                  </SheetButton>
+                ))}
+                <SheetButton
+                  active={cornerRadius >= 180}
+                  onClick={() => props.onCornerRadiusChange(240)}
+                >
+                  Round
+                </SheetButton>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold text-gray-600">
+                  <span>Corner rounding</span>
+                  <span>{Math.round(cornerRadius)} px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="240"
+                  step="1"
+                  value={Math.min(240, cornerRadius)}
+                  onChange={(event) =>
+                    props.onCornerRadiusChange(Number(event.target.value))
+                  }
+                  className="w-full"
+                />
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 text-[11px] leading-5 text-gray-500">
+                Non-destructive rounding. Image crop, replace, undo/redo and autosave keep the corner value.
+              </div>
+            </div>
+          )}
+
           {mobileSheet === "opacity" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs font-semibold"><span>Transparency</span><span>{Math.round((selected.opacity ?? 1) * 100)}%</span></div>
@@ -280,6 +332,7 @@ export default function ContextToolbar(props: Props) {
               <MobileTool label="Edit" icon="✎" onClick={() => openEditorPanel("imageEdit")} />
               <MobileTool label="Crop" icon="⌗" onClick={() => { closeSheet(); props.onStartCrop(); }} />
               <MobileTool label="Effects" icon="✦" onClick={() => openEditorPanel("imageEdit")} />
+              <MobileTool label="Corners" icon={<span className="h-4 w-5 rounded-md border-2 border-current" />} onClick={() => setMobileSheet("corners")} />
               <MobileTool label="Opacity" icon="◐" onClick={() => setMobileSheet("opacity")} />
               <MobileTool label="Position" icon="✥" onClick={() => setMobileSheet("position")} />
               <MobileTool label="Set BG" icon="▣" onClick={props.onSetImageAsBackground} />
@@ -309,6 +362,9 @@ export default function ContextToolbar(props: Props) {
             <>
               <MobileTool label="Fill" icon={<span className="h-4 w-4 rounded border" style={{ backgroundColor: shapeFill }} />} onClick={() => setMobileSheet("fill")} />
               <MobileTool label="Border" icon="□" onClick={() => setMobileSheet("border")} />
+              {["rect", "rectangle"].includes(type) && (
+                <MobileTool label="Corners" icon={<span className="h-4 w-5 rounded-md border-2 border-current" />} onClick={() => setMobileSheet("corners")} />
+              )}
               <MobileTool label="Opacity" icon="◐" onClick={() => setMobileSheet("opacity")} />
               <MobileTool label="Position" icon="✥" onClick={() => setMobileSheet("position")} />
               <MobileTool label="More" icon="•••" onClick={() => setMobileSheet("more")} />
@@ -364,6 +420,17 @@ export default function ContextToolbar(props: Props) {
               <button onClick={props.onStartCrop} className="rounded-lg border px-2.5 py-1.5">Crop</button>
               <button onClick={props.onFlipHorizontal} className="rounded-lg border px-2.5 py-1.5">Flip</button>
               <button onClick={() => props.onOpenPanel("imageEdit")} className="rounded-lg border px-2.5 py-1.5">Effects</button>
+              <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]" title="Corner rounding">
+                Corners
+                <input
+                  type="number"
+                  min="0"
+                  max="240"
+                  value={Math.round(cornerRadius)}
+                  onChange={(e) => props.onCornerRadiusChange(Number(e.target.value))}
+                  className="w-11 bg-transparent text-center text-xs outline-none"
+                />
+              </label>
               <button onClick={props.onSetImageAsBackground} className="rounded-lg border px-2.5 py-1.5">Set BG</button>
             </>
           )}
@@ -373,7 +440,19 @@ export default function ContextToolbar(props: Props) {
               <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]">Fill<input type="color" value={shapeFill} onChange={(e) => props.onUpdate({ fill: e.target.value })} className="h-6 w-7" /></label>
               <label className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]">Border<input type="color" value={shapeStroke} onChange={(e) => props.onUpdate({ stroke: e.target.value })} className="h-6 w-7" /></label>
               <input type="number" min="0" max="30" value={selected.strokeWidth ?? 0} onChange={(e) => props.onUpdate({ strokeWidth: Number(e.target.value) })} className="w-14 rounded-lg border px-2 py-1.5 text-xs" title="Border width" />
-              {["rect", "rectangle"].includes(type) && <input type="number" min="0" max="200" value={selected.rx ?? 0} onChange={(e) => props.onUpdate({ rx: Number(e.target.value), ry: Number(e.target.value) })} className="w-14 rounded-lg border px-2 py-1.5 text-xs" title="Corner radius" />}
+              {["rect", "rectangle"].includes(type) && (
+                <label className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px]" title="Corner rounding">
+                  Corners
+                  <input
+                    type="number"
+                    min="0"
+                    max="240"
+                    value={Math.round(cornerRadius)}
+                    onChange={(e) => props.onCornerRadiusChange(Number(e.target.value))}
+                    className="w-11 bg-transparent text-center text-xs outline-none"
+                  />
+                </label>
+              )}
               <button onClick={props.onFlipHorizontal} className="rounded-lg border px-2.5 py-1.5">Flip</button>
             </>
           )}

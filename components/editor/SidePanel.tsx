@@ -275,6 +275,48 @@ function TemplateThumb({
     );
   }
 
+  if (template.type.startsWith("flagship-") && template.kind === "social") {
+    const variant = template.layout % 5;
+
+    return (
+      <div
+        className={`relative mb-2 overflow-hidden rounded-lg border border-black/10 bg-white ${ratioClass}`}
+        style={{ backgroundColor: template.bg }}
+      >
+        {template.image && (
+          <img
+            src={template.image}
+            alt={`${template.name} flagship visual`}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+          />
+        )}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              variant === 0
+                ? `linear-gradient(90deg, ${template.bg}f2 0%, ${template.bg}d8 48%, transparent 82%)`
+                : variant === 1
+                ? `linear-gradient(0deg, ${template.bg}f5 0%, ${template.bg}44 62%, transparent 100%)`
+                : variant === 2
+                ? `linear-gradient(135deg, ${template.bg}f0 0%, transparent 62%)`
+                : variant === 3
+                ? `linear-gradient(180deg, transparent 0%, ${template.bg}ee 78%)`
+                : `linear-gradient(120deg, ${template.bg}ee 0%, ${template.bg}70 55%, transparent 100%)`,
+          }}
+        />
+        <div className="absolute left-[7%] top-[8%] h-[4%] w-[26%] rounded-full" style={{ backgroundColor: template.accent }} />
+        <div className="absolute left-[7%] top-[25%] h-[8%] w-[52%] rounded-sm" style={{ backgroundColor: template.fg }} />
+        <div className="absolute left-[7%] top-[37%] h-[6%] w-[41%] rounded-sm" style={{ backgroundColor: template.fg, opacity: 0.88 }} />
+        <div className="absolute bottom-[11%] left-[7%] h-[8%] w-[30%] rounded-full border border-white/20" style={{ backgroundColor: template.accent }} />
+        <div className="absolute right-[7%] top-[8%] rounded-full bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white backdrop-blur-sm">
+          Flagship
+        </div>
+      </div>
+    );
+  }
+
   if (template.kind === "resume") {
     const layout =
       template.layout % 6;
@@ -1057,9 +1099,14 @@ export default function SidePanel(
                         }
                         className="group relative rounded-xl border bg-white p-1.5 transition hover:border-violet-300 hover:shadow-md"
                       >
-                        {template.type.startsWith("premium-") && (
-                          <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white shadow">
-                            ✦ Kriyavo Premium
+                        {template.type.startsWith("flagship-") && (
+                          <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-gradient-to-r from-black via-violet-700 to-fuchsia-500 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white shadow">
+                            Kriyavo Flagship
+                          </span>
+                        )}
+                        {!template.type.startsWith("flagship-") && template.type.startsWith("premium-") && (
+                          <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-violet-600/90 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.06em] text-white shadow-sm">
+                            Premium
                           </span>
                         )}
                         <button
