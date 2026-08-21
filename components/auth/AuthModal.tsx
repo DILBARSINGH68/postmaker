@@ -145,7 +145,7 @@ export default function AuthModal({ open, mode: initialMode, onClose }: Props) {
               {mode === "signin" ? "Welcome back" : "Create your account"}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600 hover:bg-slate-200" aria-label="Close">âœ•</button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600 hover:bg-slate-200" aria-label="Close">✕</button>
         </div>
 
         {!isSupabaseConfigured && (

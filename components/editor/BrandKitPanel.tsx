@@ -288,7 +288,7 @@ export default function BrandKitPanel(props: Props) {
                     className="rounded-md px-1.5 py-1 text-[10px] text-red-500 hover:bg-red-50"
                     title="Remove logo"
                   >
-                    âœ•
+                    ✕
                   </button>
                 </div>
               </div>

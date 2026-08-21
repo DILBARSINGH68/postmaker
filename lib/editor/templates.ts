@@ -503,6 +503,8 @@ function addText(
         0,
       editable: true,
       splitByGrapheme: false,
+      originX: "left",
+      originY: "top",
       padding: 2,
     });
 
@@ -2358,7 +2360,7 @@ function resumeEditorial(
 
   addText(
     canvas,
-    "PostMaker — creator design editor\nFinance Dashboard — reporting platform",
+    "Kriyavo — creator design editor\nFinance Dashboard — reporting platform",
     {
       left: mainX,
       top: h * 0.865,

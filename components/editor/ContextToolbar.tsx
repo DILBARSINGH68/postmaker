@@ -264,7 +264,7 @@ export default function ContextToolbar(props: Props) {
           {isText && (
             <>
               <MobileTool label="Edit" icon="⌨" onClick={() => setMobileSheet("edit")} />
-              <MobileTool label="Font" icon={<span className="font-serif">Fƒ</span>} onClick={() => setMobileSheet("font")} />
+              <MobileTool label="Font" icon={<span className="font-serif">Ff</span>} onClick={() => setMobileSheet("font")} />
               <MobileTool label="Size" icon="Aa" onClick={() => setMobileSheet("size")} />
               <MobileTool label="Color" icon={<span className="relative font-bold">A<span className="absolute -bottom-1 left-0 h-0.5 w-full rounded bg-gradient-to-r from-red-500 via-yellow-400 to-blue-500" /></span>} onClick={() => setMobileSheet("color")} />
               <MobileTool label="Style" icon="B" onClick={() => setMobileSheet("style")} />

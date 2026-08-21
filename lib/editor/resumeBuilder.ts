@@ -96,7 +96,7 @@ export const DEFAULT_RESUME_DATA: ResumeData = {
   projects: [
     {
       id: "project-1",
-      name: "PostMaker",
+      name: "Kriyavo",
       description: "Creator design platform",
     },
     {

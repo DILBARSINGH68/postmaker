@@ -224,6 +224,8 @@ export default function EditorPage() {
   const rightClickTargetRef = useRef<FabricObject | null>(null);
   const pagesRef = useRef<DesignPage[]>([]);
   const activePageIndexRef = useRef(0);
+  const textEditingRef = useRef(false);
+  const textEditAnchorRef = useRef(new WeakMap<object, { x: number; y: number }>());
 
   const [cropMode, setCropMode] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -266,6 +268,8 @@ export default function EditorPage() {
     undo: false,
     redo: false,
   });
+  const [designRevision, setDesignRevision] = useState(0);
+  const [editorReady, setEditorReady] = useState(false);
 
   const canvas = () => fabricRef.current;
   const refreshCloudProjects = async () => {
@@ -837,6 +841,7 @@ export default function EditorPage() {
     updateHistoryButtons();
     refreshObjects();
     setSaved(false);
+    setDesignRevision((revision) => revision + 1);
   };
 
   useEffect(() => {
@@ -852,9 +857,9 @@ export default function EditorPage() {
 
   useEffect(() => {
     const c = canvas();
-    if (!c) return;
+    if (!c || !editorReady || restoringRef.current || textEditingRef.current) return;
 
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       const design = JSON.stringify(c.toJSON());
       const pageSnapshot = snapshotAllPages(c);
 
@@ -867,10 +872,40 @@ export default function EditorPage() {
       ).then((didSave) => {
         setSaved(didSave);
       });
-    }, 500);
+    }, 650);
 
-    return () => clearTimeout(timer);
-  }, [selected, background, format, objects, projectName, activePageIndex, pages.length]);
+    return () => window.clearTimeout(timer);
+  }, [designRevision, editorReady, background, format, projectName, activePageIndex, pages]);
+
+  useEffect(() => {
+    const c = canvas();
+    if (!c || !user || !editorReady || restoringRef.current || textEditingRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      const pageSnapshot = snapshotAllPages(c);
+      const currentIndex = Math.min(
+        Math.max(0, activePageIndexRef.current),
+        Math.max(0, pageSnapshot.length - 1)
+      );
+      const activePage = pageSnapshot[currentIndex] || captureCanvasPage(c);
+      const cloudId = getCurrentCloudDesignId(user.id);
+
+      const project: SavedProject = {
+        id: cloudId,
+        name: projectName.trim() || "Untitled Design",
+        format,
+        background: activePage.background,
+        design: activePage.design,
+        pages: pageSnapshot,
+        activePageIndex: currentIndex,
+        updatedAt: Date.now(),
+      };
+
+      void saveCloudProject(user.id, project);
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.id, designRevision, editorReady, background, format, projectName, activePageIndex, pages]);
 
   useEffect(() => {
     const canvasElement = canvasElementRef.current;
@@ -903,19 +938,85 @@ export default function EditorPage() {
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setActivePanel(null);
       }
-      refreshObjects();
     };
 
     const clearSelection = () => {
       setSelected(null);
-      refreshObjects();
     };
 
-    const modified = () => {
-      const obj = c.getActiveObject();
-      setSelected(snapshotObject(obj));
+    const isEditableText = (target: any) =>
+      ["textbox", "text", "i-text", "itext"].includes(
+        String(target?.type || target?.constructor?.name || "").toLowerCase()
+      );
 
+    const stabilizeTextTopLeft = (target: any, anchor?: { x: number; y: number }) => {
+      if (!target || !isEditableText(target)) return;
+
+      const topLeft = anchor || target.getPositionByOrigin("left", "top");
+      target.set({ originX: "left", originY: "top" });
+      target.setPositionByOrigin(topLeft, "left", "top");
+      target.setCoords();
+    };
+
+    const rememberTextAnchor = (opt: any) => {
+      const target = opt?.target;
+      if (!target || !isEditableText(target) || target.isEditing) return;
+      const topLeft = target.getPositionByOrigin("left", "top");
+      textEditAnchorRef.current.set(target, { x: topLeft.x, y: topLeft.y });
+    };
+
+    const textEditingEntered = (opt: any) => {
+      const target = opt?.target || c.getActiveObject();
+      if (!target || !isEditableText(target)) return;
+
+      const currentTopLeft = target.getPositionByOrigin("left", "top");
+      const topLeft = textEditAnchorRef.current.get(target) || {
+        x: currentTopLeft.x,
+        y: currentTopLeft.y,
+      };
+      textEditAnchorRef.current.set(target, topLeft);
+      stabilizeTextTopLeft(target, topLeft);
+      textEditingRef.current = true;
+      setSelected(snapshotObject(target));
+      c.requestRenderAll();
+    };
+
+    const textChanged = (opt: any) => {
+      const target = opt?.target || c.getActiveObject();
+      if (!target || !isEditableText(target)) return;
+
+      const anchor = textEditAnchorRef.current.get(target);
+      if (anchor) stabilizeTextTopLeft(target, anchor);
+      setSelected(snapshotObject(target));
+      c.requestRenderAll();
+    };
+
+    const textEditingExited = (opt: any) => {
+      const target = opt?.target || c.getActiveObject();
+      if (target && isEditableText(target)) {
+        const anchor = textEditAnchorRef.current.get(target);
+        if (anchor) stabilizeTextTopLeft(target, anchor);
+        textEditAnchorRef.current.delete(target);
+        setSelected(snapshotObject(target));
+      }
+
+      textEditingRef.current = false;
       if (!cropSessionRef.current) {
+        saveHistory();
+        setDesignRevision((revision) => revision + 1);
+      }
+      c.requestRenderAll();
+    };
+
+    const modified = (opt?: any) => {
+      const target = opt?.target || c.getActiveObject();
+      const active = c.getActiveObject();
+
+      if (target && active === target) {
+        setSelected(snapshotObject(target));
+      }
+
+      if (!cropSessionRef.current && !textEditingRef.current) {
         saveHistory();
       }
     };
@@ -1111,8 +1212,11 @@ export default function EditorPage() {
     c.on("selection:created", updateSelection);
     c.on("selection:updated", updateSelection);
     c.on("selection:cleared", clearSelection);
+    c.on("mouse:down", rememberTextAnchor);
     c.on("object:modified", modified);
-    c.on("text:changed", modified);
+    c.on("text:editing:entered", textEditingEntered);
+    c.on("text:changed", textChanged);
+    c.on("text:editing:exited", textEditingExited);
     c.on("object:added", refreshObjects);
     c.on("object:removed", refreshObjects);
     c.on("mouse:down", cropMouseDown);
@@ -1285,6 +1389,7 @@ export default function EditorPage() {
       refreshObjects();
       updateHistoryButtons();
       initializeSinglePage(c);
+      setEditorReady(true);
       initialContentHandled = true;
     } else if (requestedNewDesign) {
       if (requestedFormat) {
@@ -1317,6 +1422,7 @@ export default function EditorPage() {
       refreshObjects();
       updateHistoryButtons();
       initializeSinglePage(c);
+      setEditorReady(true);
       initialContentHandled = true;
     }
 
@@ -1326,6 +1432,7 @@ export default function EditorPage() {
 
         if (!autosave) {
           initializeSinglePage(c);
+          setEditorReady(true);
           return;
         }
 
@@ -1394,6 +1501,7 @@ export default function EditorPage() {
           initializeSinglePage(c);
         } finally {
           restoringRef.current = false;
+          setEditorReady(true);
         }
       });
     }
@@ -1404,6 +1512,10 @@ export default function EditorPage() {
         handleContextMenuCapture,
         true
       );
+      c.off("mouse:down", rememberTextAnchor);
+      c.off("text:editing:entered", textEditingEntered);
+      c.off("text:changed", textChanged);
+      c.off("text:editing:exited", textEditingExited);
       c.off("mouse:down", rememberRightClickTarget);
       c.off("mouse:down", cropMouseDown);
       c.off("object:moving", cropMoving);
@@ -3491,7 +3603,7 @@ export default function EditorPage() {
       lines.length > 0 &&
       lines.every((line) =>
         line.trimStart().startsWith(
-          "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ "
+          "• "
         )
       );
 
@@ -3499,14 +3611,14 @@ export default function EditorPage() {
       ? lines
           .map((line) =>
             line.replace(
-              /^\s*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢\s*/,
+              /^\s*•\s*/,
               ""
             )
           )
           .join("\n")
       : lines
           .map(
-            (line) => `ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${line}`
+            (line) => `• ${line}`
           )
           .join("\n");
 
@@ -3527,7 +3639,7 @@ export default function EditorPage() {
     name: string
   ) => {
     window.alert(
-      `${name} AI/backend feature hai. Static ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
+      `${name} AI/backend feature hai. Static ₹0 MVP me abhi UI placeholder rakha hai. Isko next phase me AI service se connect karenge.`
     );
   };
 
@@ -3537,7 +3649,11 @@ export default function EditorPage() {
 
     if (!c || !obj) return;
 
-    const objectType = String(obj.type || "").toLowerCase();
+    const objectType = String(obj.type || obj.constructor?.name || "").toLowerCase();
+    const isTextObject = ["textbox", "text", "i-text", "itext"].includes(objectType);
+    const textAnchor = isTextObject
+      ? obj.getPositionByOrigin("left", "top")
+      : null;
 
     if (objectType === "group" && typeof (obj as any).getObjects === "function") {
       const children = (obj as any).getObjects() as FabricObject[];
@@ -3565,6 +3681,15 @@ export default function EditorPage() {
       obj.set(changes);
     } else {
       obj.set(changes);
+    }
+
+    if (isTextObject && textAnchor) {
+      const anyText = obj as any;
+      if (typeof anyText.initDimensions === "function") {
+        anyText.initDimensions();
+      }
+      obj.set({ originX: "left", originY: "top" });
+      obj.setPositionByOrigin(textAnchor, "left", "top");
     }
 
     obj.setCoords();
@@ -3989,8 +4114,8 @@ export default function EditorPage() {
       [
         `Type: ${String(obj.type || "object")}`,
         `Position: ${Math.round(box.left)}, ${Math.round(box.top)}`,
-        `Size: ${Math.round(box.width)} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${Math.round(box.height)}`,
-        `Rotation: ${Math.round(obj.angle || 0)}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°`,
+        `Size: ${Math.round(box.width)} × ${Math.round(box.height)}`,
+        `Rotation: ${Math.round(obj.angle || 0)}°`,
         `Opacity: ${Math.round((obj.opacity ?? 1) * 100)}%`,
       ].join("\n")
     );
@@ -4670,7 +4795,7 @@ export default function EditorPage() {
   const cleanDownloadName = () =>
     (
       projectName.trim() ||
-      "postmaker"
+      "kriyavo"
     ).replace(
       /[\/:*?"<>|]+/g,
       "-"
@@ -5126,8 +5251,12 @@ export default function EditorPage() {
 
     commitPages(projectPages);
 
+    const projectId = user
+      ? getCurrentCloudDesignId(user.id)
+      : crypto.randomUUID();
+
     const project: SavedProject = {
-      id: crypto.randomUUID(),
+      id: projectId,
       name: projectName.trim() || "Untitled Design",
       format,
       background: activePage.background,
@@ -5184,6 +5313,7 @@ export default function EditorPage() {
     setFormat(project.format);
     setTemplateScope("format");
     setProjectName(project.name);
+    if (user) setCurrentCloudDesignId(user.id, project.id);
     setSelected(null);
     setShowProjects(false);
     commitPages(projectPages);
@@ -5431,7 +5561,7 @@ export default function EditorPage() {
 
           {cropMode && (
             <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
-              Crop mode ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· image drag karo ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ratio choose karo ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Done
+              Crop mode · image drag karo · ratio choose karo · Done
             </div>
           )}
 

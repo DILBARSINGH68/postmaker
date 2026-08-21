@@ -34,7 +34,7 @@ export default function EditorAuthGate({ children }: { children: ReactNode }) {
           <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Your account keeps your Kriyavo workspace private and prepares your designs for cloud sync across mobile and desktop.</p>
           <button type="button" onClick={() => openAuth("signin")} className="mt-6 h-11 w-full rounded-xl bg-gradient-to-r from-[#7A3CFF] via-[#FF2EA6] to-[#FF8A00] text-sm font-black text-white shadow-lg shadow-violet-100">Log in</button>
           <button type="button" onClick={() => openAuth("signup")} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700">Create free account</button>
-          <Link href="/" className="mt-5 inline-flex text-xs font-semibold text-slate-400 hover:text-slate-600">â† Back to home</Link>
+          <Link href="/" className="mt-5 inline-flex text-xs font-semibold text-slate-400 hover:text-slate-600">← Back to home</Link>
         </div>
       </main>
     );

@@ -58,7 +58,7 @@ export default function Home() {
                 </Link>
 
                 <div className="rounded-full bg-gradient-to-r from-[#7A3CFF] via-[#FF2EA6] to-[#FF8A00] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-200">
-                  Free Ã¢â‚¬Â¢ No watermark
+                  Free • No watermark
                 </div>
               </div>
             </div>
@@ -78,7 +78,10 @@ export default function Home() {
               </p>
 
               <div className="mx-auto mt-7 flex max-w-3xl items-center gap-3 rounded-2xl border border-violet-300 bg-white px-4 py-4 shadow-xl shadow-violet-100/70">
-                <span className="text-xl text-slate-400">Ã¢Å’â€¢</span>
+                <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4 4" />
+                </svg>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -129,7 +132,7 @@ export default function Home() {
               </div>
 
               <a href="#templates" className="text-sm font-semibold text-violet-600">
-                See templates Ã¢â€ â€™
+                See templates →
               </a>
             </div>
 
@@ -166,7 +169,7 @@ export default function Home() {
                     </p>
 
                     <div className="mt-5 text-sm font-semibold">
-                      Start creating Ã¢â€ â€™
+                      Start creating →
                     </div>
                   </div>
                 </Link>
@@ -358,7 +361,7 @@ export default function Home() {
               </div>
 
               <Link href="/editor" className="text-sm font-semibold text-violet-600">
-                Open projects Ã¢â€ â€™
+                Open projects →
               </Link>
             </div>
 
@@ -378,7 +381,7 @@ export default function Home() {
 
                 <p className="mt-4 max-w-xl text-sm leading-6 text-slate-400">
                   A focused design app for social media creators, small businesses,
-                  students and job seekers Ã¢â‚¬â€ without the clutter.
+                  students and job seekers — without the clutter.
                 </p>
 
                 <Link
@@ -393,7 +396,7 @@ export default function Home() {
                 {[
                   ["100+", "Social templates"],
                   ["50+", "Resume templates"],
-                  ["0Ã¢â€šÂ¹", "Core editor"],
+                  ["0₹", "Core editor"],
                   ["No", "Watermark"],
                 ].map(([value, label]) => (
                   <div

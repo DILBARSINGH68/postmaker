@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import KriyavoLogo from "@/components/brand/KriyavoLogo";
+import AuthButton from "@/components/auth/AuthButton";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, type ReactNode } from "react";
 
 import type { Format } from "@/types/editor";
@@ -51,6 +53,12 @@ function IconButton({
 
 export default function EditorHeader(props: Props) {
   const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const { user, signOut } = useAuth();
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email ||
+    "Account";
 
   return (
     <>
@@ -62,7 +70,7 @@ export default function EditorHeader(props: Props) {
               className="rounded-lg px-3 py-2 hover:bg-gray-100"
               title="Back"
             >
-              â†
+              ←
             </button>
 
             <div className="hidden md:flex items-center">
@@ -92,11 +100,12 @@ export default function EditorHeader(props: Props) {
               Save
             </button>
             <button onClick={props.onUndo} disabled={!props.canUndo} className="rounded-lg border px-3 py-2 disabled:opacity-30" title="Undo">
-              â†¶
+              ↶
             </button>
             <button onClick={props.onRedo} disabled={!props.canRedo} className="rounded-lg border px-3 py-2 disabled:opacity-30" title="Redo">
-              â†·
+              ↷
             </button>
+            <AuthButton />
             <button onClick={props.onShare} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50">
               Share
             </button>
@@ -174,12 +183,18 @@ export default function EditorHeader(props: Props) {
                   aria-label="Design name"
                 />
                 <div className="mt-1 text-xs text-gray-500">
-                  {props.format.name} â€¢ {props.format.width}px Ã— {props.format.height}px â€¢ {Math.max(1, props.pageCount)} page{props.pageCount === 1 ? "" : "s"}
+                  {props.format.name} • {props.format.width}px × {props.format.height}px • {Math.max(1, props.pageCount)} page{props.pageCount === 1 ? "" : "s"}
                 </div>
               </div>
               <button onClick={() => setShowMobileDetails(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm" aria-label="Close">
-                âœ•
+                ✕
               </button>
+            </div>
+
+            <div className="border-b px-5 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Signed in as</div>
+              <div className="mt-1 truncate text-sm font-bold text-gray-900">{displayName}</div>
+              <div className="truncate text-xs text-gray-500">{user?.email}</div>
             </div>
 
             <div className="divide-y px-2 py-2 text-sm">
@@ -188,23 +203,32 @@ export default function EditorHeader(props: Props) {
                 <span className="text-gray-500">Editing</span>
               </div>
               <button onClick={() => { setShowMobileDetails(false); props.onResize(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">â†”</span><span>Resize design</span>
+                <span className="text-lg">↔</span><span>Resize design</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onProjects(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">â–¦</span><span>View your designs</span>
+                <span className="text-lg">▦</span><span>View your designs</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onSave(); }} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="flex items-center gap-3"><span className="text-lg">âœ“</span><span>Save</span></span>
+                <span className="flex items-center gap-3"><span className="text-lg">✓</span><span>Save</span></span>
                 <span className="text-xs text-gray-400">{props.saved ? "All changes saved" : "Saving..."}</span>
               </button>
               <Link href="/editor?new=1" className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-gray-50">
-                <span className="text-lg">ï¼‹</span><span>Create new design</span>
+                <span className="text-lg">＋</span><span>Create new design</span>
               </Link>
               <button onClick={() => { setShowMobileDetails(false); props.onDownload(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">â†“</span><span>Download</span>
+                <span className="text-lg">↓</span><span>Download</span>
               </button>
               <button onClick={() => { setShowMobileDetails(false); props.onShare(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50">
-                <span className="text-lg">â†—</span><span>Share</span>
+                <span className="text-lg">↗</span><span>Share</span>
+              </button>
+              <button
+                onClick={async () => {
+                  setShowMobileDetails(false);
+                  await signOut();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-rose-600 hover:bg-rose-50"
+              >
+                <span className="text-lg">↪</span><span>Log out</span>
               </button>
             </div>
           </div>

@@ -518,7 +518,7 @@ export default function PropertiesPanel(props: Props) {
         onClick={props.duplicateSelected}
         className="w-full rounded-xl border p-3 text-sm hover:bg-gray-50"
       >
-        â§‰ Duplicate
+        ⧉ Duplicate
       </button>
 
       <button
