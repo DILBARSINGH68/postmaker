@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 
 type Props = {
   x: number;
   y: number;
   objectType: string;
   locked: boolean;
+  background?: boolean;
   onClose: () => void;
   onCopy: () => void;
   onCopyStyle: () => void;
@@ -35,6 +36,10 @@ type Props = {
   onDownloadSelection: () => void;
   onInfo: () => void;
   onUnavailable: (name: string) => void;
+  onBackgroundEdit?: () => void;
+  onBackgroundDetach?: () => void;
+  onBackgroundRemove?: () => void;
+  onBackgroundReplace?: (event: ChangeEvent<HTMLInputElement>) => void;
 };
 
 function MenuButton({
@@ -69,6 +74,14 @@ function MenuButton({
 
 export default function RightClickMenu(props: Props) {
   const [submenu, setSubmenu] = useState<"layer" | "align" | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const syncViewport = () => setIsMobile(window.innerWidth < 768);
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -98,22 +111,104 @@ export default function RightClickMenu(props: Props) {
   return (
     <div
       data-postmaker-context-menu
-      className="fixed z-[200] w-72 rounded-2xl border bg-white p-2 shadow-2xl"
-      style={{
-        left: Math.min(props.x, window.innerWidth - 300),
-        top: Math.min(props.y, window.innerHeight - 610),
-      }}
+      className={
+        isMobile
+          ? "fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[200] max-h-[72dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl"
+          : "fixed z-[200] w-72 max-h-[min(610px,calc(100vh-24px))] overflow-y-auto rounded-2xl border bg-white p-2 shadow-2xl"
+      }
+      style={
+        isMobile
+          ? undefined
+          : {
+              left: Math.max(8, Math.min(props.x, window.innerWidth - 300)),
+              top: Math.max(8, Math.min(props.y, window.innerHeight - 610)),
+            }
+      }
       onContextMenu={(e) => e.preventDefault()}
     >
-      <MenuButton onClick={props.onCopy} shortcut="Ctrl+C">
+      {isMobile && (
+        <div className="sticky top-0 z-10 mb-1 bg-white pb-1">
+          <div className="mx-auto mt-1 h-1 w-10 rounded-full bg-slate-300" />
+          <div className="mt-1 flex items-center justify-between px-2 py-2">
+            <div>
+              <div className="text-sm font-bold text-slate-900">More actions</div>
+              <div className="text-[10px] text-slate-400">{props.background ? "Background image" : "Selected object"}</div>
+            </div>
+            <button
+              type="button"
+              onClick={props.onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-600"
+              aria-label="Close more actions"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="h-px bg-slate-100" />
+        </div>
+      )}
+
+      {props.background ? (
+        props.locked ? (
+          <div className="p-1">
+            <div className="mb-2 rounded-xl bg-amber-50 px-3 py-3">
+              <div className="text-xs font-bold text-amber-800">🔒 Background locked</div>
+              <div className="mt-1 text-[11px] leading-5 text-amber-700">
+                Unlock the background before editing, replacing or removing it.
+              </div>
+            </div>
+            <MenuButton onClick={props.onLock}>
+              🔓 Unlock background
+            </MenuButton>
+          </div>
+        ) : (
+          <>
+            <MenuButton onClick={() => props.onBackgroundEdit?.()}>
+              ✥ Edit crop & zoom
+            </MenuButton>
+            <MenuButton onClick={props.onLock}>
+              🔒 Lock background
+            </MenuButton>
+            <MenuButton onClick={() => props.onBackgroundDetach?.()}>
+              ↗ Detach from background
+            </MenuButton>
+            <label className="flex w-full cursor-pointer items-center rounded-lg px-3 py-2 text-sm hover:bg-gray-100">
+              ↻ Replace background image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => props.onBackgroundReplace?.(event)}
+                className="hidden"
+              />
+            </label>
+            <div className="my-1 border-t" />
+            <MenuButton onClick={() => props.onBackgroundRemove?.()} danger>
+              🗑 Remove background image
+            </MenuButton>
+          </>
+        )
+      ) : props.locked ? (
+        <div className="p-1">
+          <div className="mb-2 rounded-xl bg-amber-50 px-3 py-3">
+            <div className="text-xs font-bold text-amber-800">🔒 Locked</div>
+            <div className="mt-1 text-[11px] leading-5 text-amber-700">
+              Unlock this object to edit, move, resize, rotate or use other actions.
+            </div>
+          </div>
+          <MenuButton onClick={props.onLock}>
+            🔓 Unlock object
+          </MenuButton>
+        </div>
+      ) : (
+        <>
+      <MenuButton onClick={props.onCopy} shortcut={isMobile ? undefined : "Ctrl+C"}>
         ⧉ Copy
       </MenuButton>
 
-      <MenuButton onClick={props.onCopyStyle} shortcut="Ctrl+Alt+C">
+      <MenuButton onClick={props.onCopyStyle} shortcut={isMobile ? undefined : "Ctrl+Alt+C"}>
         🖌 Copy style
       </MenuButton>
 
-      <MenuButton onClick={props.onPaste} shortcut="Ctrl+V">
+      <MenuButton onClick={props.onPaste} shortcut={isMobile ? undefined : "Ctrl+V"}>
         📋 Paste
       </MenuButton>
 
@@ -121,11 +216,11 @@ export default function RightClickMenu(props: Props) {
         🖌 Paste style
       </MenuButton>
 
-      <MenuButton onClick={props.onDuplicate} shortcut="Ctrl+D">
+      <MenuButton onClick={props.onDuplicate} shortcut={isMobile ? undefined : "Ctrl+D"}>
         ⧉ Duplicate
       </MenuButton>
 
-      <MenuButton onClick={props.onDelete} shortcut="Delete" danger>
+      <MenuButton onClick={props.onDelete} shortcut={isMobile ? undefined : "Delete"} danger>
         🗑 Delete
       </MenuButton>
 
@@ -185,11 +280,11 @@ export default function RightClickMenu(props: Props) {
 
 
 
-      <MenuButton onClick={props.onLock} shortcut="Alt+Shift+L">
-        🔒 {props.locked ? "Unlock" : "Lock"}
+      <MenuButton onClick={props.onLock} shortcut={isMobile ? undefined : "Alt+Shift+L"}>
+        🔒 Lock object
       </MenuButton>
 
-      <MenuButton onClick={props.onLink} shortcut="Ctrl+K">
+      <MenuButton onClick={props.onLink} shortcut={isMobile ? undefined : "Ctrl+K"}>
         🔗 Link
       </MenuButton>
 
@@ -217,6 +312,8 @@ export default function RightClickMenu(props: Props) {
       <MenuButton onClick={props.onInfo}>
         ⓘ Info
       </MenuButton>
+        </>
+      )}
     </div>
   );
 }

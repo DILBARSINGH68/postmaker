@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type RefObject, type TouchEvent } from "react";
 import { StaticCanvas } from "fabric";
 
-import type { DesignPage, Format } from "@/types/editor";
+import type { DesignPage, Format, SelectedSnapshot } from "@/types/editor";
 import { getEditorCanvasSize } from "@/lib/editor/canvasSize";
 
 export type SnapGuides = {
@@ -24,6 +24,24 @@ type Props = {
   onDuplicatePage: (index: number) => void;
   onDeletePage: (index: number) => void;
   onTogglePageHidden: (index: number) => void;
+  selected: SelectedSnapshot | null;
+  quickActionsEnabled: boolean;
+  backgroundSelected: boolean;
+  backgroundEditing: boolean;
+  backgroundLocked: boolean;
+  backgroundZoom: number;
+  onBackgroundToggleLock: () => void;
+  onBackgroundDone: () => void;
+  onBackgroundCancel: () => void;
+  onBackgroundReset: () => void;
+  onBackgroundZoomChange: (value: number) => void;
+  onBackgroundDetach: () => void;
+  onBackgroundRemove: () => void;
+  onBackgroundReplace: (event: ChangeEvent<HTMLInputElement>) => void;
+  onWorkspaceMarqueeSelect: (rect: { left: number; top: number; width: number; height: number }) => void;
+  onDeleteSelected: () => void;
+  onUnlockSelected: () => void;
+  onOpenSelectedMore: (position: { x: number; y: number }) => void;
   onDeselect: () => void;
 };
 
@@ -163,6 +181,13 @@ export default function CanvasArea(props: Props) {
     x: number;
     y: number;
   } | null>(null);
+  const [workspaceMarquee, setWorkspaceMarquee] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [backgroundMoreOpen, setBackgroundMoreOpen] = useState(false);
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
 
   const getTouchDistance = (event: TouchEvent<HTMLElement>) => {
@@ -209,6 +234,43 @@ export default function CanvasArea(props: Props) {
   const activeCanvasTop =
     activePageIndex * (pageBlockHeight + PAGE_GAP) + PAGE_HEADER_HEIGHT;
 
+  const quickActionPosition = useMemo(() => {
+    const selection = props.selected;
+    if (!selection || !props.quickActionsEnabled) return null;
+
+    const left = Number(selection.left ?? 0);
+    const top = Number(selection.top ?? 0);
+    const width = Math.max(1, Number(selection.width ?? 1));
+    const height = Math.max(1, Number(selection.height ?? 1));
+
+    const centerX = (left + width / 2) * scale;
+    const selectionTop = top * scale;
+    const selectionBottom = (top + height) * scale;
+    const safeCenterX = Math.min(
+      Math.max(52, centerX),
+      Math.max(52, displayWidth - 52)
+    );
+
+    const placeBelow = selectionTop < 54;
+    const topPx = placeBelow ? selectionBottom + 10 : selectionTop - 48;
+
+    return {
+      left: safeCenterX,
+      top: topPx,
+    };
+  }, [
+    props.selected,
+    props.quickActionsEnabled,
+    scale,
+    displayWidth,
+  ]);
+
+  useEffect(() => {
+    if (!props.backgroundSelected || props.backgroundEditing) {
+      setBackgroundMoreOpen(false);
+    }
+  }, [props.backgroundSelected, props.backgroundEditing]);
+
   useEffect(() => {
     const root = sectionRef.current;
     if (!root) return;
@@ -228,8 +290,13 @@ export default function CanvasArea(props: Props) {
       ref={sectionRef}
       onPointerDown={(event) => {
         const target = event.target as HTMLElement;
-        if (target.closest('[data-kriyavo-canvas-interactive="true"]')) {
+        if (
+          event.pointerType !== "mouse" ||
+          event.button !== 0 ||
+          target.closest('[data-kriyavo-canvas-interactive="true"]')
+        ) {
           workspacePointerRef.current = null;
+          setWorkspaceMarquee(null);
           return;
         }
 
@@ -238,23 +305,65 @@ export default function CanvasArea(props: Props) {
           x: event.clientX,
           y: event.clientY,
         };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const start = workspacePointerRef.current;
+        if (!start || start.pointerId !== event.pointerId) return;
+
+        const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+        if (distance <= 6) return;
+
+        setWorkspaceMarquee({
+          left: Math.min(start.x, event.clientX),
+          top: Math.min(start.y, event.clientY),
+          width: Math.abs(event.clientX - start.x),
+          height: Math.abs(event.clientY - start.y),
+        });
       }}
       onPointerUp={(event) => {
         const start = workspacePointerRef.current;
         workspacePointerRef.current = null;
+        const marquee = workspaceMarquee;
+        setWorkspaceMarquee(null);
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
         if (!start || start.pointerId !== event.pointerId) return;
 
-        const distance = Math.hypot(
-          event.clientX - start.x,
-          event.clientY - start.y
-        );
+        const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+        if (distance <= 6) {
+          props.onDeselect();
+          return;
+        }
 
-        // A real click on the gray workspace clears selection. A drag that
-        // starts outside the canvas must not clear the active object.
-        if (distance <= 6) props.onDeselect();
+        const activeCanvas = sectionRef.current?.querySelector<HTMLElement>(
+          '[data-kriyavo-active-canvas="true"]'
+        );
+        if (!activeCanvas) return;
+
+        const canvasRect = activeCanvas.getBoundingClientRect();
+        const selection = marquee || {
+          left: Math.min(start.x, event.clientX),
+          top: Math.min(start.y, event.clientY),
+          width: Math.abs(event.clientX - start.x),
+          height: Math.abs(event.clientY - start.y),
+        };
+        const right = Math.min(selection.left + selection.width, canvasRect.right);
+        const bottom = Math.min(selection.top + selection.height, canvasRect.bottom);
+        const left = Math.max(selection.left, canvasRect.left);
+        const top = Math.max(selection.top, canvasRect.top);
+
+        if (right <= left || bottom <= top) return;
+
+        props.onWorkspaceMarqueeSelect({
+          left: (left - canvasRect.left) / scale,
+          top: (top - canvasRect.top) / scale,
+          width: (right - left) / scale,
+          height: (bottom - top) / scale,
+        });
       }}
       onPointerCancel={() => {
         workspacePointerRef.current = null;
+        setWorkspaceMarquee(null);
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -262,6 +371,14 @@ export default function CanvasArea(props: Props) {
       onTouchCancel={handleTouchEnd}
       className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-[#ececec] touch-pan-x touch-pan-y"
     >
+      {workspaceMarquee && (
+        <div
+          className="pointer-events-none fixed z-[240] border border-violet-500 bg-violet-400/10 shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset]"
+          style={workspaceMarquee}
+          aria-hidden="true"
+        />
+      )}
+
       <div className="flex h-max min-h-full w-max min-w-full justify-center p-3 pb-28 pt-4 sm:p-4 sm:pb-32 sm:pt-6 md:p-10 md:pb-20 md:pt-12">
         <div
           className="relative shrink-0"
@@ -410,6 +527,7 @@ export default function CanvasArea(props: Props) {
           >
             <div
               data-kriyavo-canvas-interactive="true"
+              data-kriyavo-active-canvas="true"
               className="pointer-events-auto absolute left-0 top-0 overflow-visible"
               style={{
                 width: editorSize.width,
@@ -444,6 +562,331 @@ export default function CanvasArea(props: Props) {
                 ))}
               </div>
             </div>
+
+            {props.backgroundSelected && (
+              <>
+                {!props.backgroundEditing ? (
+                  <div
+                    data-kriyavo-canvas-interactive="true"
+                    className="pointer-events-auto absolute left-1/2 z-[68] flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
+                    style={{ top: activeCanvasTop + 10 }}
+                    role="toolbar"
+                    aria-label={props.backgroundLocked ? "Background locked" : "Background image quick actions"}
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    {props.backgroundLocked ? (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setBackgroundMoreOpen(false);
+                          props.onBackgroundToggleLock();
+                        }}
+                        className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-amber-50 px-3 text-lg text-amber-800 transition hover:bg-amber-100 active:scale-95"
+                        title="Locked — click to unlock"
+                        aria-label="Unlock background"
+                      >
+                        🔒
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setBackgroundMoreOpen(false);
+                            props.onBackgroundRemove();
+                          }}
+                          className="flex h-9 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95"
+                          title="Remove background image"
+                          aria-label="Remove background image"
+                        >
+                          <TrashIcon />
+                        </button>
+
+                        <div className="h-6 w-px bg-slate-200" />
+
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setBackgroundMoreOpen((open) => !open);
+                          }}
+                          className="flex h-9 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 active:scale-95"
+                          title="More background actions"
+                          aria-label="More background actions"
+                          aria-expanded={backgroundMoreOpen}
+                        >
+                          <span className="translate-y-[-1px] text-[20px] font-black tracking-[2px] leading-none">•••</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    data-kriyavo-canvas-interactive="true"
+                    className="pointer-events-auto absolute left-1/2 z-[68] w-[min(94vw,620px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white/97 p-2 shadow-[0_14px_40px_rgba(15,23,42,0.20)] backdrop-blur"
+                    style={{ top: activeCanvasTop + 10 }}
+                    role="toolbar"
+                    aria-label="Background crop and zoom"
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[11px] font-bold text-slate-700">Zoom {Math.round(props.backgroundZoom)}%</span>
+                        <input
+                          type="range"
+                          min="100"
+                          max="300"
+                          step="1"
+                          value={props.backgroundZoom}
+                          onChange={(event) => props.onBackgroundZoomChange(Number(event.target.value))}
+                          className="min-w-0 flex-1 accent-violet-600"
+                          aria-label="Background zoom"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <span className="mr-1 text-[10px] text-slate-500">Drag image to reposition</span>
+                        <button type="button" onClick={props.onBackgroundReset} className="rounded-xl border px-3 py-2 text-[11px] font-semibold">Reset</button>
+                        <button type="button" onClick={props.onBackgroundCancel} className="rounded-xl border px-3 py-2 text-[11px] font-semibold">Cancel</button>
+                        <button type="button" onClick={props.onBackgroundDone} className="rounded-xl bg-violet-600 px-4 py-2 text-[11px] font-bold text-white">Done</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {backgroundMoreOpen && !props.backgroundEditing && (
+                  <>
+                    <div
+                      data-kriyavo-canvas-interactive="true"
+                      className="pointer-events-auto absolute left-1/2 z-[190] hidden w-72 -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl md:block"
+                      style={{ top: activeCanvasTop + 58 }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex items-start justify-between gap-3 px-3 py-2">
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">Background image</div>
+                          <div className="mt-0.5 text-[10px] text-slate-400">Single click selects only · double-click opens crop</div>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${props.backgroundLocked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
+                          {props.backgroundLocked ? "🔒 Locked" : "🔓 Unlocked"}
+                        </span>
+                      </div>
+                      {props.backgroundLocked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBackgroundMoreOpen(false);
+                            props.onBackgroundToggleLock();
+                          }}
+                          className="flex w-full items-center rounded-xl bg-amber-50 px-3 py-3 text-left text-sm font-bold text-amber-800 hover:bg-amber-100"
+                        >
+                          🔓 Unlock background
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundToggleLock();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            🔒 Lock background
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundDetach();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            Detach from background
+                          </button>
+                          <label className="flex w-full cursor-pointer items-center rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                            Replace image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => {
+                                setBackgroundMoreOpen(false);
+                                props.onBackgroundReplace(event);
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundRemove();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                          >
+                            Remove background image
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <div
+                      data-kriyavo-canvas-interactive="true"
+                      className="pointer-events-auto fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[210] max-h-[70dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl md:hidden"
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
+                      <div className="mx-auto mt-1 h-1 w-10 rounded-full bg-slate-300" />
+                      <div className="flex items-center justify-between px-3 py-3">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">Background image</div>
+                          <div className="text-[10px] text-slate-400">{props.backgroundLocked ? "Unlock to crop and zoom" : "Double-tap the canvas to crop and zoom"}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setBackgroundMoreOpen(false)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs"
+                          aria-label="Close background actions"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="h-px bg-slate-100" />
+                      <div className="px-3 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${props.backgroundLocked ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
+                          {props.backgroundLocked ? "🔒 Locked" : "🔓 Unlocked"}
+                        </span>
+                      </div>
+                      {props.backgroundLocked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBackgroundMoreOpen(false);
+                            props.onBackgroundToggleLock();
+                          }}
+                          className="flex w-full items-center rounded-xl bg-amber-50 px-3 py-3 text-left text-sm font-bold text-amber-800 active:bg-amber-100"
+                        >
+                          🔓 Unlock background
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundToggleLock();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-700 active:bg-slate-50"
+                          >
+                            🔒 Lock background
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundDetach();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm text-slate-700 active:bg-slate-50"
+                          >
+                            Detach from background
+                          </button>
+                          <label className="flex w-full cursor-pointer items-center rounded-xl px-3 py-3 text-sm text-slate-700 active:bg-slate-50">
+                            Replace image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => {
+                                setBackgroundMoreOpen(false);
+                                props.onBackgroundReplace(event);
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBackgroundMoreOpen(false);
+                              props.onBackgroundRemove();
+                            }}
+                            className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-semibold text-rose-600 active:bg-rose-50"
+                          >
+                            Remove background image
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {quickActionPosition && (
+              <div
+                data-kriyavo-canvas-interactive="true"
+                className="pointer-events-auto absolute z-[65] flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
+                style={{
+                  left: quickActionPosition.left,
+                  top: quickActionPosition.top,
+                }}
+                role="toolbar"
+                aria-label={props.selected?.selectable === false ? "Selected object locked" : "Selected object quick actions"}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {props.selected?.selectable === false ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      props.onUnlockSelected();
+                    }}
+                    className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-amber-50 px-3 text-lg text-amber-800 transition hover:bg-amber-100 active:scale-95"
+                    title="Locked — click to unlock"
+                    aria-label="Unlock selected object"
+                  >
+                    🔒
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        props.onDeleteSelected();
+                      }}
+                      className="flex h-9 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95"
+                      title="Delete selected object"
+                      aria-label="Delete selected object"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M4 7h16" />
+                        <path d="M9 7V4h6v3" />
+                        <path d="M7 7l1 13h8l1-13" />
+                        <path d="M10 11v5M14 11v5" />
+                      </svg>
+                    </button>
+
+                    <div className="h-6 w-px bg-slate-200" />
+
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        props.onOpenSelectedMore({
+                          x: rect.left + rect.width / 2,
+                          y: rect.bottom + 6,
+                        });
+                      }}
+                      className="flex h-9 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 active:scale-95"
+                      title="More actions"
+                      aria-label="More actions"
+                    >
+                      <span className="translate-y-[-1px] text-[20px] font-black tracking-[2px] leading-none">•••</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

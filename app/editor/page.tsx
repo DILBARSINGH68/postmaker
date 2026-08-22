@@ -47,6 +47,8 @@ const fabricCustomProperties = [
   "cornerRadius",
   "templateImage",
   "templateImageUrl",
+  "isCanvasBackgroundImage",
+  "backgroundLocked",
 ];
 
 FabricObject.customProperties = Array.from(
@@ -153,6 +155,11 @@ type CropSession = {
   sourceHeight: number;
 };
 
+type BackgroundEditSession = {
+  object: FabricImage;
+  original: { left: number; top: number; scaleX: number; scaleY: number };
+};
+
 const normalizeBrandColor = (value: unknown) => {
   if (typeof value !== "string") return null;
 
@@ -224,6 +231,10 @@ export default function EditorPage() {
   const clipboardRef = useRef<FabricObject | null>(null);
   const styleClipboardRef = useRef<Record<string, any> | null>(null);
   const cropSessionRef = useRef<CropSession | null>(null);
+  const backgroundImageRef = useRef<FabricImage | null>(null);
+  const backgroundEditRef = useRef<BackgroundEditSession | null>(null);
+  const backgroundEditingRef = useRef(false);
+  const backgroundTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const rightClickTargetRef = useRef<FabricObject | null>(null);
   const pagesRef = useRef<DesignPage[]>([]);
   const activePageIndexRef = useRef(0);
@@ -231,6 +242,10 @@ export default function EditorPage() {
   const textEditAnchorRef = useRef(new WeakMap<object, { x: number; y: number }>());
 
   const [cropMode, setCropMode] = useState(false);
+  const [backgroundSelected, setBackgroundSelected] = useState(false);
+  const [backgroundEditing, setBackgroundEditing] = useState(false);
+  const [backgroundLocked, setBackgroundLocked] = useState(false);
+  const [backgroundZoom, setBackgroundZoom] = useState(100);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -497,6 +512,85 @@ export default function EditorPage() {
     anyObject.dirty = true;
   };
 
+  const isCanvasBackgroundImage = (object: FabricObject | null | undefined) =>
+    Boolean((object as any)?.isCanvasBackgroundImage);
+
+  const isBackgroundLocked = (object: FabricObject | null | undefined) =>
+    Boolean(isCanvasBackgroundImage(object) && (object as any)?.backgroundLocked === true);
+
+  const isLockedObject = (object: FabricObject | null | undefined) =>
+    Boolean(object && !isCanvasBackgroundImage(object) && object.selectable === false);
+
+  const normalizeLockedObjectInteraction = (object: FabricObject) => {
+    if (!isLockedObject(object)) return;
+
+    const objectType = String(object.type || object.constructor?.name || "").toLowerCase();
+    const isTextObject = ["textbox", "text", "i-text", "itext"].includes(objectType);
+
+    object.set({
+      evented: true,
+      hasControls: false,
+      hasBorders: true,
+      lockMovementX: true,
+      lockMovementY: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      hoverCursor: "default",
+      moveCursor: "default",
+      ...(isTextObject ? { editable: false } : {}),
+    } as any);
+  };
+
+  const getCanvasBackgroundImage = (c: Canvas | null = canvas()) => {
+    if (!c) return null;
+    const cached = backgroundImageRef.current;
+    if (cached && c.getObjects().includes(cached)) return cached;
+    const found = c.getObjects().find((object) => isCanvasBackgroundImage(object)) as FabricImage | undefined;
+    backgroundImageRef.current = found || null;
+    return found || null;
+  };
+
+  const minimumBackgroundScale = (c: Canvas, image: FabricImage) =>
+    Math.max(c.getWidth() / Math.max(1, image.width || 1), c.getHeight() / Math.max(1, image.height || 1));
+
+  const clampBackgroundPosition = (c: Canvas, image: FabricImage) => {
+    const visualWidth = Math.max(1, (image.width || 1) * Math.abs(image.scaleX || 1));
+    const visualHeight = Math.max(1, (image.height || 1) * Math.abs(image.scaleY || 1));
+    image.set({
+      left: Math.min(0, Math.max(Math.min(0, c.getWidth() - visualWidth), image.left || 0)),
+      top: Math.min(0, Math.max(Math.min(0, c.getHeight() - visualHeight), image.top || 0)),
+    });
+    image.setCoords();
+  };
+
+  const protectBackgroundImage = (c: Canvas, image: FabricImage) => {
+    (image as any).isCanvasBackgroundImage = true;
+    if (typeof (image as any).backgroundLocked !== "boolean") {
+      (image as any).backgroundLocked = false;
+    }
+    image.set({ angle: 0, selectable: false, evented: false, hasControls: false, hasBorders: false, lockMovementX: true, lockMovementY: true, lockScalingX: true, lockScalingY: true, lockRotation: true, hoverCursor: "default" } as any);
+    const minScale = minimumBackgroundScale(c, image);
+    const scale = Math.max(minScale, Math.abs(image.scaleX || minScale));
+    image.set({ scaleX: scale, scaleY: scale });
+    clampBackgroundPosition(c, image);
+    c.sendObjectToBack(image);
+    backgroundImageRef.current = image;
+    setBackgroundLocked(isBackgroundLocked(image));
+  };
+
+  const syncBackgroundProtection = (c: Canvas) => {
+    const backgrounds = c.getObjects().filter((object) => isCanvasBackgroundImage(object)) as FabricImage[];
+    const background = backgrounds[0] || null;
+    backgrounds.slice(1).forEach((object) => c.remove(object));
+    if (!background) {
+      backgroundImageRef.current = null;
+      setBackgroundLocked(false);
+      return;
+    }
+    protectBackgroundImage(c, background);
+  };
+
   const normalizeLoadedObjectOrigins = (c: Canvas) => {
     c.getObjects().forEach((obj) => {
       const topLeft = obj.getPositionByOrigin(
@@ -512,9 +606,11 @@ export default function EditorPage() {
       });
 
       syncImageCornerClip(obj);
+      normalizeLockedObjectInteraction(obj);
       obj.setCoords();
     });
 
+    syncBackgroundProtection(c);
     c.calcOffset();
     c.requestRenderAll();
   };
@@ -558,6 +654,15 @@ export default function EditorPage() {
       size.height
     );
 
+    const backgroundImage = getCanvasBackgroundImage(c);
+    if (backgroundImage) {
+      const minScale = minimumBackgroundScale(c, backgroundImage);
+      const scale = Math.max(minScale, Math.abs(backgroundImage.scaleX || minScale));
+      backgroundImage.set({ scaleX: scale, scaleY: scale });
+      clampBackgroundPosition(c, backgroundImage);
+      protectBackgroundImage(c, backgroundImage);
+    }
+
     return size;
   };
 
@@ -579,6 +684,10 @@ export default function EditorPage() {
     const sourceHeight = Math.max(1, Number(targetPage.height || targetSize.height));
 
     restoringRef.current = true;
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
     setContextMenu(null);
     setSnapGuides({ vertical: [], horizontal: [] });
     c.discardActiveObject();
@@ -1044,7 +1153,14 @@ export default function EditorPage() {
 
     const updateSelection = () => {
       const obj = c.getActiveObject();
-      setSelected(snapshotObject(obj));
+      if (isCanvasBackgroundImage(obj)) {
+        setSelected(null);
+        setBackgroundSelected(true);
+        setBackgroundLocked(isBackgroundLocked(obj));
+      } else {
+        setBackgroundSelected(false);
+        setSelected(snapshotObject(obj));
+      }
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setActivePanel(null);
       }
@@ -1052,6 +1168,21 @@ export default function EditorPage() {
 
     const clearSelection = () => {
       setSelected(null);
+    };
+
+    let selectionFrame: number | null = null;
+    const updateTransientSelection = (opt?: any) => {
+      const target = opt?.target || c.getActiveObject();
+      if (!target || c.getActiveObject() !== target) return;
+      if (isCanvasBackgroundImage(target)) { setSelected(null); return; }
+      if (selectionFrame !== null) return;
+
+      selectionFrame = window.requestAnimationFrame(() => {
+        selectionFrame = null;
+        if (c.getActiveObject() === target) {
+          setSelected(snapshotObject(target));
+        }
+      });
     };
 
     const isEditableText = (target: any) =>
@@ -1126,7 +1257,7 @@ export default function EditorPage() {
         setSelected(snapshotObject(target));
       }
 
-      if (!cropSessionRef.current && !textEditingRef.current) {
+      if (!cropSessionRef.current && !backgroundEditingRef.current && !textEditingRef.current) {
         saveHistory();
       }
     };
@@ -1184,10 +1315,10 @@ export default function EditorPage() {
     };
 
     const smartSnapMoving = (opt: any) => {
-      if (cropSessionRef.current) return;
+      if (cropSessionRef.current || backgroundEditingRef.current) return;
 
       const target = opt.target as FabricObject | undefined;
-      if (!target) return;
+      if (!target || isCanvasBackgroundImage(target)) return;
 
       target.setCoords();
 
@@ -1220,7 +1351,8 @@ export default function EditorPage() {
         if (
           other === target ||
           selectedChildren.has(other) ||
-          other.visible === false
+          other.visible === false ||
+          isCanvasBackgroundImage(other)
         ) {
           return;
         }
@@ -1343,6 +1475,57 @@ export default function EditorPage() {
     c.on("selection:updated", updateSelection);
     c.on("selection:cleared", clearSelection);
     c.on("mouse:down", rememberTextAnchor);
+
+    const backgroundMouseDown = (opt: any) => {
+      const background = getCanvasBackgroundImage(c);
+      const event = opt?.e as MouseEvent | PointerEvent | TouchEvent | undefined;
+      if (!background || !event) return;
+
+      if (backgroundEditingRef.current) return;
+
+      if (opt.target && opt.target !== background) {
+        setBackgroundSelected(false);
+        return;
+      }
+
+      c.discardActiveObject();
+      setSelected(null);
+      setBackgroundSelected(true);
+      setBackgroundLocked(isBackgroundLocked(background));
+      c.requestRenderAll();
+
+      // Strict rule: single click/tap only selects the background.
+      // Crop/zoom is entered only by desktop mouse:dblclick or the
+      // native touch pointer-up double-tap handler registered below.
+    };
+
+    const backgroundDoubleClick = (opt: any) => {
+      const background = getCanvasBackgroundImage(c);
+      if (!background || backgroundEditingRef.current || isBackgroundLocked(background)) return;
+      if (opt?.target && opt.target !== background) return;
+      setBackgroundSelected(true);
+      setBackgroundLocked(false);
+      startBackgroundEdit();
+    };
+
+    c.on("mouse:down", backgroundMouseDown);
+    c.on("mouse:dblclick", backgroundDoubleClick);
+
+    const selectLockedTarget = (opt: any) => {
+      const target = opt?.target as FabricObject | undefined;
+      if (!target || !isLockedObject(target) || target.visible === false) return;
+
+      setBackgroundSelected(false);
+      target.set({ selectable: true });
+      c.setActiveObject(target);
+      target.set({ selectable: false });
+      target.setCoords();
+      setSelected(snapshotObject(target));
+      setContextMenu(null);
+      c.requestRenderAll();
+    };
+
+    c.on("mouse:down", selectLockedTarget);
     c.on("object:modified", modified);
     c.on("text:editing:entered", textEditingEntered);
     c.on("text:changed", textChanged);
@@ -1350,13 +1533,61 @@ export default function EditorPage() {
     c.on("object:added", objectAdded);
     c.on("object:removed", objectRemoved);
     c.on("mouse:down", cropMouseDown);
+    const backgroundMoving = (opt: any) => {
+      const target = opt?.target as FabricImage | undefined;
+      if (!backgroundEditingRef.current || !target || !isCanvasBackgroundImage(target)) return;
+      clampBackgroundPosition(c, target);
+      c.requestRenderAll();
+    };
+
     c.on("object:moving", cropMoving);
+    c.on("object:moving", backgroundMoving);
     c.on("object:moving", smartSnapMoving);
+    c.on("object:moving", updateTransientSelection);
+    c.on("object:scaling", updateTransientSelection);
+    c.on("object:rotating", updateTransientSelection);
     c.on("object:modified", clearSmartGuides);
     c.on("mouse:up", cropMouseUp);
 
     const wrapperEl = c.wrapperEl;
     const upperCanvas = c.upperCanvasEl;
+
+    const handleBackgroundTouchPointerUp = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || backgroundEditingRef.current) return;
+
+      const background = getCanvasBackgroundImage(c);
+      if (!background || isBackgroundLocked(background)) {
+        backgroundTapRef.current = null;
+        return;
+      }
+
+      const target = (c as any).findTarget?.(event) as FabricObject | undefined;
+      if (target && target !== background) {
+        backgroundTapRef.current = null;
+        return;
+      }
+
+      const now = Date.now();
+      const x = Number(event.clientX || 0);
+      const y = Number(event.clientY || 0);
+      const last = backgroundTapRef.current;
+      const isDoubleTap =
+        Boolean(last) &&
+        now - (last?.time || 0) <= 360 &&
+        Math.hypot(x - (last?.x || 0), y - (last?.y || 0)) <= 24;
+
+      if (isDoubleTap) {
+        backgroundTapRef.current = null;
+        setBackgroundSelected(true);
+        setBackgroundLocked(false);
+        startBackgroundEdit();
+        return;
+      }
+
+      backgroundTapRef.current = { time: now, x, y };
+    };
+
+    upperCanvas.addEventListener("pointerup", handleBackgroundTouchPointerUp);
 
     const rememberRightClickTarget = (opt: any) => {
       const e = opt.e as MouseEvent | PointerEvent | undefined;
@@ -1424,14 +1655,34 @@ export default function EditorPage() {
       rightClickTargetRef.current = null;
 
       if (!target) {
+        const background = getCanvasBackgroundImage(c);
+        if (background) {
+          c.discardActiveObject();
+          setSelected(null);
+          setBackgroundSelected(true);
+          setBackgroundLocked(isBackgroundLocked(background));
+          c.requestRenderAll();
+          setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+          });
+          return;
+        }
+
         setContextMenu(null);
         return;
       }
 
+      setBackgroundSelected(false);
+
       // `target` comes from Fabric's own mouse event, so it is a real
       // FabricObject. Do not use findTarget(nativeContextMenuEvent) here.
       if (c.getActiveObject() !== target) {
+        const lockedTarget = isLockedObject(target);
+        if (lockedTarget) target.set({ selectable: true });
         c.setActiveObject(target, e as any);
+        if (lockedTarget) target.set({ selectable: false });
+        target.setCoords();
       }
 
       c.requestRenderAll();
@@ -1677,11 +1928,21 @@ export default function EditorPage() {
       c.off("object:added", objectAdded);
       c.off("object:removed", objectRemoved);
       c.off("mouse:down", rememberRightClickTarget);
+      c.off("mouse:down", backgroundMouseDown);
+      c.off("mouse:dblclick", backgroundDoubleClick);
       c.off("mouse:down", cropMouseDown);
       c.off("object:moving", cropMoving);
+      c.off("object:moving", backgroundMoving);
       c.off("object:moving", smartSnapMoving);
+      c.off("object:moving", updateTransientSelection);
+      c.off("object:scaling", updateTransientSelection);
+      c.off("object:rotating", updateTransientSelection);
       c.off("object:modified", clearSmartGuides);
       c.off("mouse:up", cropMouseUp);
+      upperCanvas.removeEventListener("pointerup", handleBackgroundTouchPointerUp);
+      if (selectionFrame !== null) {
+        window.cancelAnimationFrame(selectionFrame);
+      }
       void c.dispose();
 
       if (fabricRef.current === c) {
@@ -1699,7 +1960,8 @@ export default function EditorPage() {
       .filter(
         (object) =>
           object.visible !== false &&
-          object.selectable !== false
+          object.selectable !== false &&
+          !isCanvasBackgroundImage(object)
       );
 
     c.discardActiveObject();
@@ -1801,7 +2063,7 @@ export default function EditorPage() {
     const c = canvas();
     const active = c?.getActiveObject();
 
-    if (!c || !active) return;
+    if (!c || !active || isLockedObject(active)) return;
 
     let bounds = active.getBoundingRect();
 
@@ -1912,6 +2174,16 @@ export default function EditorPage() {
         return;
       }
 
+      if (backgroundEditingRef.current) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          cancelBackgroundEdit();
+        } else if (e.key === "Delete" || e.key === "Backspace") {
+          e.preventDefault();
+        }
+        return;
+      }
+
       const commandKey = e.ctrlKey || e.metaKey;
       const pressedKey = e.key.toLowerCase();
       const rightBracket = pressedKey === "]" || e.code === "BracketRight";
@@ -1997,7 +2269,9 @@ export default function EditorPage() {
       if (!commandKey && !e.altKey && pressedKey === "tab") {
         const selectable = c
           .getObjects()
-          .filter((object) => object.visible !== false && object.selectable !== false);
+          .filter(
+            (object) => object.visible !== false && object.selectable !== false && !isCanvasBackgroundImage(object)
+          );
         if (selectable.length) {
           e.preventDefault();
           const current = c.getActiveObject();
@@ -2085,7 +2359,7 @@ export default function EditorPage() {
       }
 
       const active = c.getActiveObject();
-      if (!active) return;
+      if (!active || isLockedObject(active)) return;
 
       const step = e.shiftKey ? 10 : 1;
 
@@ -2946,68 +3220,76 @@ export default function EditorPage() {
     e.target.value = "";
   };
 
+  const installBackgroundImage = (c: Canvas, image: FabricImage) => {
+    const existing = getCanvasBackgroundImage(c);
+    if (existing && existing !== image) {
+      if (c.getActiveObject() === existing) c.discardActiveObject();
+      c.remove(existing);
+    }
+
+    const element = image.getElement() as HTMLImageElement;
+    const sourceWidth = element.naturalWidth || element.width || image.width || 1;
+    const sourceHeight = element.naturalHeight || element.height || image.height || 1;
+
+    image.set({
+      width: sourceWidth,
+      height: sourceHeight,
+      cropX: 0,
+      cropY: 0,
+      cornerRadius: 0,
+      clipPath: undefined,
+      angle: 0,
+      backgroundLocked: false,
+    } as any);
+
+    const minScale = minimumBackgroundScale(c, image);
+    image.set({
+      left: (c.getWidth() - sourceWidth * minScale) / 2,
+      top: (c.getHeight() - sourceHeight * minScale) / 2,
+      scaleX: minScale,
+      scaleY: minScale,
+    });
+
+    if (!c.getObjects().includes(image)) c.add(image);
+    protectBackgroundImage(c, image);
+    c.discardActiveObject();
+    c.requestRenderAll();
+    setSelected(null);
+    setBackgroundSelected(true);
+    setBackgroundEditing(false);
+    backgroundEditingRef.current = false;
+    backgroundEditRef.current = null;
+    setBackgroundZoom(100);
+    refreshObjects();
+    saveHistory();
+  };
+
   const uploadBackgroundImage = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file =
-      e.target.files?.[0];
-
+    const file = e.target.files?.[0];
     const c = canvas();
-
     if (!file || !c) return;
 
-    const reader =
-      new FileReader();
-
+    const reader = new FileReader();
     reader.onload = async () => {
-      if (
-        typeof reader.result !==
-        "string"
-      ) {
-        return;
-      }
-
-      const img =
-        await FabricImage.fromURL(
-          reader.result
-        );
-
-      const scale = Math.max(
-        c.getWidth() /
-          (img.width || 1),
-        c.getHeight() /
-          (img.height || 1)
-      );
-
-      img.set({
-        left:
-          (c.getWidth() -
-            (img.width || 1) *
-              scale) /
-          2,
-        top:
-          (c.getHeight() -
-            (img.height || 1) *
-              scale) /
-          2,
-        scaleX: scale,
-        scaleY: scale,
-      });
-
-      c.add(img);
-      c.sendObjectToBack(img);
-      c.setActiveObject(img);
-      c.renderAll();
-
-      setSelected(
-        snapshotObject(img)
-      );
-
-      saveHistory();
+      if (typeof reader.result !== "string") return;
+      const image = await FabricImage.fromURL(reader.result);
+      installBackgroundImage(c, image);
     };
-
     reader.readAsDataURL(file);
     e.target.value = "";
+  };
+
+  const replaceBackgroundImage = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const existing = getCanvasBackgroundImage();
+    if (existing && isBackgroundLocked(existing)) {
+      e.target.value = "";
+      return;
+    }
+    uploadBackgroundImage(e);
   };
 
   const replaceSelectedImage = (
@@ -3068,66 +3350,194 @@ export default function EditorPage() {
     e.target.value = "";
   };
 
-  const setImageAsBackground =
-    () => {
-      const c = canvas();
-      const obj =
-        c?.getActiveObject();
+  const setImageAsBackground = () => {
+    const c = canvas();
+    const object = c?.getActiveObject();
 
-      if (
-        !c ||
-        !obj ||
-        ![
-          "image",
-          "fabricimage",
-        ].includes(
-          String(
-            obj.type ||
-              obj.constructor
-                ?.name ||
-              ""
-          ).toLowerCase()
-        )
-      ) {
-        return;
-      }
+    if (
+      !c ||
+      !object ||
+      isCanvasBackgroundImage(object) ||
+      !["image", "fabricimage"].includes(
+        String(object.type || object.constructor?.name || "").toLowerCase()
+      )
+    ) {
+      return;
+    }
 
-      const image =
-        obj as FabricImage;
+    installBackgroundImage(c, object as FabricImage);
+  };
 
-      const scale = Math.max(
-        c.getWidth() /
-          (image.width || 1),
-        c.getHeight() /
-          (image.height || 1)
-      );
+  const startBackgroundEdit = () => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image || backgroundEditingRef.current || isBackgroundLocked(image)) return;
 
-      image.set({
-        left:
-          (c.getWidth() -
-            (image.width || 1) *
-              scale) /
-          2,
-        top:
-          (c.getHeight() -
-            (image.height || 1) *
-              scale) /
-          2,
-        scaleX: scale,
-        scaleY: scale,
-        angle: 0,
-      });
+    const minScale = minimumBackgroundScale(c, image);
+    const currentScale = Math.max(minScale, Math.abs(image.scaleX || minScale));
 
-      image.setCoords();
-      c.sendObjectToBack(image);
-      c.renderAll();
-
-      setSelected(
-        snapshotObject(image)
-      );
-
-      saveHistory();
+    backgroundEditRef.current = {
+      object: image,
+      original: {
+        left: image.left || 0,
+        top: image.top || 0,
+        scaleX: image.scaleX || currentScale,
+        scaleY: image.scaleY || currentScale,
+      },
     };
+    backgroundEditingRef.current = true;
+    setBackgroundEditing(true);
+    setBackgroundSelected(true);
+    setBackgroundZoom(Math.round((currentScale / minScale) * 100));
+    setSelected(null);
+    setContextMenu(null);
+
+    image.set({
+      selectable: true,
+      evented: true,
+      hasControls: false,
+      hasBorders: false,
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      hoverCursor: "move",
+      moveCursor: "move",
+    } as any);
+    c.setActiveObject(image);
+    image.setCoords();
+    c.requestRenderAll();
+  };
+
+  const setBackgroundZoomPercent = (value: number) => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image || !backgroundEditingRef.current) return;
+
+    const zoomPercent = Math.min(300, Math.max(100, Number(value) || 100));
+    const minScale = minimumBackgroundScale(c, image);
+    const nextScale = minScale * (zoomPercent / 100);
+    const oldScale = Math.max(0.0001, Math.abs(image.scaleX || minScale));
+    const centerX = (image.left || 0) + ((image.width || 1) * oldScale) / 2;
+    const centerY = (image.top || 0) + ((image.height || 1) * oldScale) / 2;
+
+    image.set({
+      scaleX: nextScale,
+      scaleY: nextScale,
+      left: centerX - ((image.width || 1) * nextScale) / 2,
+      top: centerY - ((image.height || 1) * nextScale) / 2,
+    });
+    clampBackgroundPosition(c, image);
+    c.requestRenderAll();
+    setBackgroundZoom(Math.round(zoomPercent));
+  };
+
+  const resetBackgroundEdit = () => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image) return;
+
+    const minScale = minimumBackgroundScale(c, image);
+    image.set({
+      scaleX: minScale,
+      scaleY: minScale,
+      left: (c.getWidth() - (image.width || 1) * minScale) / 2,
+      top: (c.getHeight() - (image.height || 1) * minScale) / 2,
+    });
+    clampBackgroundPosition(c, image);
+    c.requestRenderAll();
+    setBackgroundZoom(100);
+  };
+
+  const finishBackgroundEdit = () => {
+    const c = canvas();
+    const session = backgroundEditRef.current;
+    if (!c || !session) return;
+
+    c.discardActiveObject();
+    protectBackgroundImage(c, session.object);
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(true);
+    setSelected(null);
+    c.requestRenderAll();
+    refreshObjects();
+    saveHistory();
+  };
+
+  const cancelBackgroundEdit = () => {
+    const c = canvas();
+    const session = backgroundEditRef.current;
+    if (!c || !session) return;
+
+    session.object.set(session.original);
+    c.discardActiveObject();
+    protectBackgroundImage(c, session.object);
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(true);
+    setSelected(null);
+    c.requestRenderAll();
+    const minScale = minimumBackgroundScale(c, session.object);
+    setBackgroundZoom(Math.round((Math.abs(session.object.scaleX || minScale) / minScale) * 100));
+  };
+
+  const detachBackgroundImage = () => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image || isBackgroundLocked(image)) return;
+
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+
+    (image as any).isCanvasBackgroundImage = false;
+    (image as any).backgroundLocked = false;
+    setBackgroundLocked(false);
+    image.set({
+      selectable: true,
+      evented: true,
+      hasControls: true,
+      hasBorders: true,
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      lockRotation: false,
+      hoverCursor: "move",
+      moveCursor: "move",
+    } as any);
+    backgroundImageRef.current = null;
+    setBackgroundSelected(false);
+    c.setActiveObject(image);
+    image.setCoords();
+    c.requestRenderAll();
+    setSelected(snapshotObject(image));
+    refreshObjects();
+    saveHistory();
+  };
+
+  const removeBackgroundImage = () => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image || isBackgroundLocked(image)) return;
+
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
+    setBackgroundLocked(false);
+    backgroundImageRef.current = null;
+    if (c.getActiveObject() === image) c.discardActiveObject();
+    c.remove(image);
+    c.requestRenderAll();
+    setSelected(null);
+    refreshObjects();
+    saveHistory();
+  };
 
   const removePlainImageBackground =
     async (
@@ -3923,7 +4333,7 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isLockedObject(obj)) return;
 
     const objectType = String(obj.type || obj.constructor?.name || "").toLowerCase();
     const isTextObject = ["textbox", "text", "i-text", "itext"].includes(objectType);
@@ -4273,7 +4683,7 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isLockedObject(obj)) return;
 
     const box = obj.getBoundingRect();
     const center = obj.getCenterPoint();
@@ -4563,14 +4973,16 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj) || isLockedObject(obj)) return;
 
     const type = String(obj.type || "").toLowerCase();
 
     if (["activeselection", "active-selection"].includes(type)) {
-      const members = (obj as ActiveSelection).getObjects();
+      const members = (obj as ActiveSelection)
+        .getObjects()
+        .filter((member) => !isCanvasBackgroundImage(member));
       c.discardActiveObject();
-      c.remove(...members);
+      if (members.length) c.remove(...members);
     } else {
       c.remove(obj);
       c.discardActiveObject();
@@ -4586,7 +4998,7 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isLockedObject(obj)) return;
 
     const type = String(obj.type || "").toLowerCase();
 
@@ -4632,9 +5044,11 @@ export default function EditorPage() {
   const bringForward = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj) || isLockedObject(obj)) return;
 
     c.bringObjectForward(obj);
+    const protectedBackground = getCanvasBackgroundImage(c);
+    if (protectedBackground && protectedBackground !== obj) c.sendObjectToBack(protectedBackground);
     c.renderAll();
     saveHistory();
   };
@@ -4642,9 +5056,11 @@ export default function EditorPage() {
   const sendBackward = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj) || isLockedObject(obj)) return;
 
     c.sendObjectBackwards(obj);
+    const protectedBackground = getCanvasBackgroundImage(c);
+    if (protectedBackground && protectedBackground !== obj) c.sendObjectToBack(protectedBackground);
     c.renderAll();
     saveHistory();
   };
@@ -4652,9 +5068,11 @@ export default function EditorPage() {
   const bringToFront = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj) || isLockedObject(obj)) return;
 
     c.bringObjectToFront(obj);
+    const protectedBackground = getCanvasBackgroundImage(c);
+    if (protectedBackground && protectedBackground !== obj) c.sendObjectToBack(protectedBackground);
     c.renderAll();
     saveHistory();
   };
@@ -4662,9 +5080,11 @@ export default function EditorPage() {
   const sendToBack = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj) || isLockedObject(obj)) return;
 
     c.sendObjectToBack(obj);
+    const protectedBackground = getCanvasBackgroundImage(c);
+    if (protectedBackground && protectedBackground !== obj) c.sendObjectToBack(protectedBackground);
     c.renderAll();
     saveHistory();
   };
@@ -4673,26 +5093,32 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj)) return;
 
     const nextLocked = obj.selectable !== false;
+    const objectType = String(obj.type || obj.constructor?.name || "").toLowerCase();
+    const isTextObject = ["textbox", "text", "i-text", "itext"].includes(objectType);
 
     obj.set({
       selectable: !nextLocked,
-      evented: !nextLocked,
+      evented: true,
+      hasControls: !nextLocked,
+      hasBorders: true,
       lockMovementX: nextLocked,
       lockMovementY: nextLocked,
       lockScalingX: nextLocked,
       lockScalingY: nextLocked,
       lockRotation: nextLocked,
-    });
+      hoverCursor: nextLocked ? "default" : "move",
+      moveCursor: nextLocked ? "default" : "move",
+      ...(isTextObject ? { editable: !nextLocked } : {}),
+    } as any);
 
-    if (nextLocked) {
-      c.discardActiveObject();
-      setSelected(null);
-    }
-
-    c.renderAll();
+    c.setActiveObject(obj);
+    obj.setCoords();
+    setSelected(snapshotObject(obj));
+    setContextMenu(null);
+    c.requestRenderAll();
     refreshObjects();
     saveHistory();
   };
@@ -4701,7 +5127,7 @@ export default function EditorPage() {
     const c = canvas();
     const obj = c?.getActiveObject();
 
-    if (!c || !obj) return;
+    if (!c || !obj || isCanvasBackgroundImage(obj)) return;
 
     const visible = obj.visible !== false;
     obj.set({ visible: !visible });
@@ -4719,7 +5145,7 @@ export default function EditorPage() {
   const flipHorizontal = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isLockedObject(obj)) return;
 
     obj.set({ flipX: !obj.flipX });
     c.renderAll();
@@ -4731,7 +5157,7 @@ export default function EditorPage() {
   const flipVertical = () => {
     const c = canvas();
     const obj = c?.getActiveObject();
-    if (!c || !obj) return;
+    if (!c || !obj || isLockedObject(obj)) return;
 
     obj.set({ flipY: !obj.flipY });
     c.renderAll();
@@ -4746,6 +5172,10 @@ export default function EditorPage() {
 
     historyIndexRef.current--;
 
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
     restoringRef.current = true;
     await c.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]));
     normalizeLoadedObjectOrigins(c);
@@ -4772,6 +5202,10 @@ export default function EditorPage() {
 
     historyIndexRef.current++;
 
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
     restoringRef.current = true;
     await c.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]));
     normalizeLoadedObjectOrigins(c);
@@ -5010,6 +5444,12 @@ export default function EditorPage() {
     c.backgroundColor = background;
     c.renderAll();
 
+    backgroundImageRef.current = null;
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
+    setBackgroundLocked(false);
     setSelected(null);
     saveHistory();
   };
@@ -5027,6 +5467,11 @@ export default function EditorPage() {
       setZoom(fitZoomForFormat(templateFormat));
     }
 
+    backgroundImageRef.current = null;
+    backgroundEditRef.current = null;
+    backgroundEditingRef.current = false;
+    setBackgroundEditing(false);
+    setBackgroundSelected(false);
     applyTemplate(c, type);
     c.calcOffset();
     c.requestRenderAll();
@@ -5667,6 +6112,51 @@ export default function EditorPage() {
     }
   };
 
+  const selectObjectsInWorkspaceMarquee = (rect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }) => {
+    const c = canvas();
+    if (!c) return;
+
+    const right = rect.left + rect.width;
+    const bottom = rect.top + rect.height;
+    const selectedObjects = c.getObjects().filter((object) => {
+      if (object.visible === false || object.selectable === false || isCanvasBackgroundImage(object)) return false;
+      const box = object.getBoundingRect();
+      return (
+        box.left + box.width >= rect.left &&
+        box.left <= right &&
+        box.top + box.height >= rect.top &&
+        box.top <= bottom
+      );
+    });
+
+    c.discardActiveObject();
+    setBackgroundSelected(false);
+
+    if (!selectedObjects.length) {
+      setSelected(null);
+      c.requestRenderAll();
+      return;
+    }
+
+    if (selectedObjects.length === 1) {
+      c.setActiveObject(selectedObjects[0]);
+      setSelected(snapshotObject(selectedObjects[0]));
+      c.requestRenderAll();
+      return;
+    }
+
+    const selection = new ActiveSelection(selectedObjects, { canvas: c });
+    c.setActiveObject(selection);
+    selection.setCoords();
+    setSelected(snapshotObject(selection));
+    c.requestRenderAll();
+  };
+
   const deselectCanvasObject = () => {
     const c = canvas();
     if (!c) return;
@@ -5684,13 +6174,14 @@ export default function EditorPage() {
     c.discardActiveObject();
     c.requestRenderAll();
     setSelected(null);
+    setBackgroundSelected(false);
     setContextMenu(null);
     setSnapGuides({ vertical: [], horizontal: [] });
   };
 
   const reorderLayer = (dragged: FabricObject, target: FabricObject) => {
     const c = canvas();
-    if (!c || dragged === target) return;
+    if (!c || dragged === target || isCanvasBackgroundImage(dragged) || isCanvasBackgroundImage(target)) return;
 
     const getIndex = (object: FabricObject) => c.getObjects().indexOf(object);
     let fromIndex = getIndex(dragged);
@@ -5714,6 +6205,8 @@ export default function EditorPage() {
       fromIndex = nextIndex;
     }
 
+    const protectedBackground = getCanvasBackgroundImage(c);
+    if (protectedBackground) c.sendObjectToBack(protectedBackground);
     c.requestRenderAll();
     refreshObjects();
     saveHistory();
@@ -5723,9 +6216,23 @@ export default function EditorPage() {
     const c = canvas();
     if (!c) return;
 
-    if (object.visible === false || object.selectable === false) return;
+    if (isCanvasBackgroundImage(object)) {
+      c.discardActiveObject();
+      setSelected(null);
+      setBackgroundSelected(true);
+      setBackgroundLocked(isBackgroundLocked(object));
+      c.requestRenderAll();
+      return;
+    }
 
+    if (object.visible === false) return;
+
+    setBackgroundSelected(false);
+    const locked = isLockedObject(object);
+    if (locked) object.set({ selectable: true });
     c.setActiveObject(object);
+    if (locked) object.set({ selectable: false });
+    object.setCoords();
     c.renderAll();
     setSelected(snapshotObject(object));
   };
@@ -5747,28 +6254,73 @@ export default function EditorPage() {
     saveHistory();
   };
 
+  const toggleBackgroundLock = () => {
+    const c = canvas();
+    const image = getCanvasBackgroundImage(c);
+    if (!c || !image) return;
+
+    const nextLocked = !isBackgroundLocked(image);
+    if (nextLocked && backgroundEditingRef.current) {
+      finishBackgroundEdit();
+    }
+
+    (image as any).backgroundLocked = nextLocked;
+    protectBackgroundImage(c, image);
+    setBackgroundSelected(true);
+    setBackgroundLocked(nextLocked);
+    backgroundTapRef.current = null;
+    setContextMenu(null);
+    c.requestRenderAll();
+    refreshObjects();
+    saveHistory();
+  };
+
   const toggleLayerLock = (object: FabricObject) => {
     const c = canvas();
     if (!c) return;
 
+    if (isCanvasBackgroundImage(object)) {
+      const nextLocked = !isBackgroundLocked(object);
+      if (nextLocked && backgroundEditingRef.current) {
+        finishBackgroundEdit();
+      }
+      (object as any).backgroundLocked = nextLocked;
+      protectBackgroundImage(c, object as FabricImage);
+      setBackgroundSelected(true);
+      setBackgroundLocked(nextLocked);
+      backgroundTapRef.current = null;
+      c.requestRenderAll();
+      refreshObjects();
+      saveHistory();
+      return;
+    }
+
     const nextLocked = object.selectable !== false;
+    const objectType = String(object.type || object.constructor?.name || "").toLowerCase();
+    const isTextObject = ["textbox", "text", "i-text", "itext"].includes(objectType);
 
     object.set({
       selectable: !nextLocked,
-      evented: !nextLocked,
+      evented: true,
+      hasControls: !nextLocked,
+      hasBorders: true,
       lockMovementX: nextLocked,
       lockMovementY: nextLocked,
       lockScalingX: nextLocked,
       lockScalingY: nextLocked,
       lockRotation: nextLocked,
-    });
+      hoverCursor: nextLocked ? "default" : "move",
+      moveCursor: nextLocked ? "default" : "move",
+      ...(isTextObject ? { editable: !nextLocked } : {}),
+    } as any);
 
-    if (nextLocked && c.getActiveObject() === object) {
-      c.discardActiveObject();
-      setSelected(null);
+    if (c.getActiveObject() === object) {
+      c.setActiveObject(object);
+      setSelected(snapshotObject(object));
     }
 
-    c.renderAll();
+    object.setCoords();
+    c.requestRenderAll();
     refreshObjects();
     saveHistory();
   };
@@ -5777,6 +6329,8 @@ export default function EditorPage() {
     setContextMenu(null);
     setActivePanel((current) => (current === panel ? null : panel));
   };
+
+  const selectedLocked = Boolean(selected?.selectable === false);
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-[#f3f3f3] text-gray-900">
@@ -5816,7 +6370,7 @@ export default function EditorPage() {
           templateScope={templateScope}
           background={background}
           objects={objects}
-          selected={selected}
+          selected={selectedLocked ? null : selected}
           cropMode={cropMode}
           brandKit={brandKit}
           resumeData={resumeData}
@@ -5911,7 +6465,7 @@ export default function EditorPage() {
 
         <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
           <ContextToolbar
-            selected={selected}
+            selected={backgroundSelected || backgroundEditing || selectedLocked ? null : selected}
             onUpdate={updateSelected}
             onDuplicate={() => void duplicateSelected()}
             onDelete={deleteSelected}
@@ -5936,8 +6490,8 @@ export default function EditorPage() {
           />
 
           <PositionPanel
-            open={showPosition}
-            selected={selected}
+            open={showPosition && !backgroundSelected && !backgroundEditing && !selectedLocked}
+            selected={backgroundSelected || backgroundEditing || selectedLocked ? null : selected}
             onClose={() => setShowPosition(false)}
             onTransform={updateExactTransform}
             onAlign={alignSelectedToPage}
@@ -5949,6 +6503,12 @@ export default function EditorPage() {
           {cropMode && (
             <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
               Crop mode · image drag karo · ratio choose karo · Done
+            </div>
+          )}
+
+          {backgroundEditing && (
+            <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
+              Background edit · drag to reposition · minimum cover zoom protected
             </div>
           )}
 
@@ -5965,6 +6525,32 @@ export default function EditorPage() {
             onDuplicatePage={duplicateDesignPageAt}
             onDeletePage={deleteDesignPageAt}
             onTogglePageHidden={toggleDesignPageHidden}
+            selected={selected}
+            quickActionsEnabled={!cropMode && !contextMenu && !backgroundSelected && !backgroundEditing}
+            backgroundSelected={backgroundSelected}
+            backgroundEditing={backgroundEditing}
+            backgroundLocked={backgroundLocked}
+            backgroundZoom={backgroundZoom}
+            onBackgroundToggleLock={toggleBackgroundLock}
+            onBackgroundDone={finishBackgroundEdit}
+            onBackgroundCancel={cancelBackgroundEdit}
+            onBackgroundReset={resetBackgroundEdit}
+            onBackgroundZoomChange={setBackgroundZoomPercent}
+            onBackgroundDetach={detachBackgroundImage}
+            onBackgroundRemove={removeBackgroundImage}
+            onBackgroundReplace={replaceBackgroundImage}
+            onWorkspaceMarqueeSelect={selectObjectsInWorkspaceMarquee}
+            onDeleteSelected={() => {
+              setContextMenu(null);
+              deleteSelected();
+            }}
+            onUnlockSelected={() => {
+              setContextMenu(null);
+              if (selected?.selectable === false) toggleSelectedLock();
+            }}
+            onOpenSelectedMore={(position) => {
+              setContextMenu(position);
+            }}
             onDeselect={deselectCanvasObject}
           />
         </div>
@@ -5983,7 +6569,59 @@ export default function EditorPage() {
         onZoomChange={setZoom}
       />
 
-      {contextMenu && selected && (
+      {contextMenu && backgroundSelected && (
+        <RightClickMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          objectType="background"
+          background
+          locked={backgroundLocked}
+          onClose={() => setContextMenu(null)}
+          onCopy={() => {}}
+          onCopyStyle={() => {}}
+          onPaste={() => {}}
+          onPasteStyle={() => {}}
+          onDuplicate={() => {}}
+          onDelete={() => {
+            setContextMenu(null);
+            removeBackgroundImage();
+          }}
+          onBringToFront={() => {}}
+          onBringForward={() => {}}
+          onSendBackward={() => {}}
+          onSendToBack={() => {}}
+          onAlign={() => {}}
+          onLock={() => {
+            setContextMenu(null);
+            toggleBackgroundLock();
+          }}
+          onLink={() => {}}
+          onAltText={() => {}}
+          onSetImageAsBackground={() => {}}
+          onApplyColorToPage={() => {}}
+          onDownloadSelection={() => {}}
+          onInfo={() => {}}
+          onUnavailable={unavailableTool}
+          onBackgroundEdit={() => {
+            setContextMenu(null);
+            startBackgroundEdit();
+          }}
+          onBackgroundDetach={() => {
+            setContextMenu(null);
+            detachBackgroundImage();
+          }}
+          onBackgroundRemove={() => {
+            setContextMenu(null);
+            removeBackgroundImage();
+          }}
+          onBackgroundReplace={(event) => {
+            setContextMenu(null);
+            replaceBackgroundImage(event);
+          }}
+        />
+      )}
+
+      {contextMenu && !backgroundSelected && selected && (
         <RightClickMenu
           x={contextMenu.x}
           y={contextMenu.y}

@@ -145,6 +145,10 @@ function layerName(
 ) {
   const obj = object as any;
 
+  if (obj.isCanvasBackgroundImage) {
+    return "Background image";
+  }
+
   if (obj.isMockup) {
     return obj.mockupName || `Mockup ${index + 1}`;
   }
@@ -1491,17 +1495,22 @@ export default function SidePanel(
                       object.visible !==
                       false;
 
-                    const locked =
-                      object.selectable ===
-                      false;
+                    const isBackground = Boolean((object as any).isCanvasBackgroundImage);
+                    const locked = isBackground
+                      ? Boolean((object as any).backgroundLocked)
+                      : object.selectable === false;
                     const isDragOver =
                       dragOverLayer === object && draggedLayer !== object;
 
                     return (
                       <div
                         key={`${object.type}-${originalIndex}`}
-                        draggable
+                        draggable={!isBackground && !locked}
                         onDragStart={(event) => {
+                          if (isBackground || locked) {
+                            event.preventDefault();
+                            return;
+                          }
                           setDraggedLayer(object);
                           setDragOverLayer(null);
                           event.dataTransfer.effectAllowed = "move";
@@ -1532,7 +1541,7 @@ export default function SidePanel(
                           setDraggedLayer(null);
                           setDragOverLayer(null);
                         }}
-                        className={`flex cursor-grab items-center gap-2 rounded-xl border p-2 transition active:cursor-grabbing ${
+                        className={`flex items-center gap-2 rounded-xl border p-2 transition ${isBackground || locked ? "cursor-default border-slate-200 bg-slate-50" : "cursor-grab active:cursor-grabbing"} ${
                           isDragOver
                             ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100"
                             : draggedLayer === object
@@ -1542,10 +1551,10 @@ export default function SidePanel(
                       >
                         <span
                           className="select-none text-sm font-black tracking-[-0.18em] text-gray-300"
-                          title="Drag to reorder"
+                          title={isBackground ? "Background always stays fixed at the bottom" : locked ? "Unlock to reorder" : "Drag to reorder"}
                           aria-hidden="true"
                         >
-                          ⋮⋮
+                          {isBackground ? "BG" : "⋮⋮"}
                         </span>
 
                         <button
@@ -1580,17 +1589,23 @@ export default function SidePanel(
 
                         <button
                           type="button"
-                          onClick={() =>
-                            props.onToggleLayerLock(
-                              object
-                            )
+                          onClick={() => props.onToggleLayerLock(object)}
+                          className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition ${
+                            locked
+                              ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                          }`}
+                          title={
+                            isBackground
+                              ? locked
+                                ? "Background locked — click to unlock. It always stays fixed in place."
+                                : "Background unlocked for editing — click to lock. It still stays fixed on single click."
+                              : locked
+                              ? "Layer locked — click to unlock"
+                              : "Layer unlocked — click to lock"
                           }
-                          className="rounded-lg px-2 py-1 text-xs hover:bg-gray-100"
-                          title={locked ? "Unlock layer" : "Lock layer"}
                         >
-                          {locked
-                            ? "🔒"
-                            : "🔓"}
+                          {locked ? "🔒 Locked" : "🔓 Unlocked"}
                         </button>
                       </div>
                     );
