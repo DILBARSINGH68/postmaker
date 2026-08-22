@@ -34,7 +34,7 @@ const ITEMS: RailItem[] = [
 export default function LeftRail({ activePanel, onTogglePanel }: Props) {
   return (
     <aside
-      className="postmaker-desktop-rail hidden h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white py-2 md:flex"
+      className="postmaker-desktop-rail hidden h-full min-h-0 shrink-0 flex-col overflow-visible border-r border-gray-200 bg-white py-2 md:flex"
       style={{ width: 66, flex: "0 0 66px" }}
       aria-label="Editor tools"
     >

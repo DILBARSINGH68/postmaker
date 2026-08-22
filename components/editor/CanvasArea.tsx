@@ -158,6 +158,11 @@ export default function CanvasArea(props: Props) {
   const editorSize = getEditorCanvasSize(props.format);
   const scale = props.zoom / 100;
   const sectionRef = useRef<HTMLElement | null>(null);
+  const workspacePointerRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
 
   const getTouchDistance = (event: TouchEvent<HTMLElement>) => {
@@ -223,8 +228,33 @@ export default function CanvasArea(props: Props) {
       ref={sectionRef}
       onPointerDown={(event) => {
         const target = event.target as HTMLElement;
-        if (target.closest('[data-kriyavo-canvas-interactive="true"]')) return;
-        props.onDeselect();
+        if (target.closest('[data-kriyavo-canvas-interactive="true"]')) {
+          workspacePointerRef.current = null;
+          return;
+        }
+
+        workspacePointerRef.current = {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }}
+      onPointerUp={(event) => {
+        const start = workspacePointerRef.current;
+        workspacePointerRef.current = null;
+        if (!start || start.pointerId !== event.pointerId) return;
+
+        const distance = Math.hypot(
+          event.clientX - start.x,
+          event.clientY - start.y
+        );
+
+        // A real click on the gray workspace clears selection. A drag that
+        // starts outside the canvas must not clear the active object.
+        if (distance <= 6) props.onDeselect();
+      }}
+      onPointerCancel={() => {
+        workspacePointerRef.current = null;
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
