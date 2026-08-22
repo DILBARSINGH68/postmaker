@@ -184,6 +184,11 @@ export default function CanvasArea(props: Props) {
     x: number;
     y: number;
   } | null>(null);
+  const touchWorkspaceTapRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [workspaceMarquee, setWorkspaceMarquee] = useState<{
     left: number;
     top: number;
@@ -250,45 +255,21 @@ export default function CanvasArea(props: Props) {
     return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
   };
 
-  const touchesInsideSelectedObject = (event: TouchEvent<HTMLElement>) => {
-    const selected = props.selected;
-    if (
-      !selected ||
-      selected.selectable === false ||
-      props.backgroundSelected ||
-      props.backgroundEditing ||
-      event.touches.length !== 2
-    ) {
-      return false;
-    }
-
-    const activeCanvas = sectionRef.current?.querySelector<HTMLElement>(
-      '[data-kriyavo-active-canvas="true"]'
-    );
-    if (!activeCanvas) return false;
-
-    const canvasRect = activeCanvas.getBoundingClientRect();
-    const left = canvasRect.left + Number(selected.left ?? 0) * scale;
-    const top = canvasRect.top + Number(selected.top ?? 0) * scale;
-    const width = Math.max(1, Number(selected.width ?? 1) * scale);
-    const height = Math.max(1, Number(selected.height ?? 1) * scale);
-    const padding = 26;
-
-    return Array.from(event.touches).every(
-      (touch) =>
-        touch.clientX >= left - padding &&
-        touch.clientX <= left + width + padding &&
-        touch.clientY >= top - padding &&
-        touch.clientY <= top + height + padding
-    );
-  };
-
   const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
     if (event.touches.length !== 2) return;
     const distance = getTouchDistance(event);
     if (!distance) return;
 
-    if (touchesInsideSelectedObject(event)) {
+    // Canva-style mobile rule: while a normal object is selected, a two-finger
+    // gesture anywhere in the editor scales that selected object. Canvas zoom
+    // is reserved for the no-selection state.
+    const selectedObjectGesture =
+      Boolean(props.selected) &&
+      props.selected?.selectable !== false &&
+      !props.backgroundSelected &&
+      !props.backgroundEditing;
+
+    if (selectedObjectGesture) {
       const started = props.onSelectedPinchStart();
       if (!started) {
         pinchRef.current = null;
@@ -420,6 +401,26 @@ export default function CanvasArea(props: Props) {
       ref={sectionRef}
       onPointerDown={(event) => {
         const target = event.target as HTMLElement;
+
+        if (event.pointerType === "touch") {
+          workspacePointerRef.current = null;
+          setWorkspaceMarquee(null);
+
+          if (target.closest('[data-kriyavo-canvas-interactive="true"]')) {
+            touchWorkspaceTapRef.current = null;
+            return;
+          }
+
+          touchWorkspaceTapRef.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+          };
+          return;
+        }
+
+        touchWorkspaceTapRef.current = null;
+
         if (
           event.pointerType !== "mouse" ||
           event.button !== 0 ||
@@ -452,6 +453,23 @@ export default function CanvasArea(props: Props) {
         });
       }}
       onPointerUp={(event) => {
+        if (event.pointerType === "touch") {
+          const touchStart = touchWorkspaceTapRef.current;
+          touchWorkspaceTapRef.current = null;
+
+          if (!touchStart || touchStart.pointerId !== event.pointerId) return;
+
+          const touchDistance = Math.hypot(
+            event.clientX - touchStart.x,
+            event.clientY - touchStart.y
+          );
+
+          if (touchDistance <= 10 && !pinchRef.current) {
+            props.onDeselect();
+          }
+          return;
+        }
+
         const start = workspacePointerRef.current;
         workspacePointerRef.current = null;
         const marquee = workspaceMarquee;
@@ -493,6 +511,7 @@ export default function CanvasArea(props: Props) {
       }}
       onPointerCancel={() => {
         workspacePointerRef.current = null;
+        touchWorkspaceTapRef.current = null;
         setWorkspaceMarquee(null);
       }}
       onTouchStart={handleTouchStart}

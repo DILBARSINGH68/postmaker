@@ -1673,23 +1673,69 @@ export default function EditorPage() {
       scroller: HTMLElement | null;
       scrollLeft: number;
       scrollTop: number;
+      windowX: number;
+      windowY: number;
     } | null = null;
 
     const restoreMobileEditorScroll = (
       scroller: HTMLElement | null,
       left: number,
-      top: number
+      top: number,
+      windowX = window.scrollX,
+      windowY = window.scrollY
     ) => {
-      if (!scroller) return;
       const restore = () => {
-        scroller.scrollLeft = left;
-        scroller.scrollTop = top;
+        if (scroller) {
+          scroller.scrollLeft = left;
+          scroller.scrollTop = top;
+        }
+        window.scrollTo({
+          left: windowX,
+          top: windowY,
+          behavior: "auto",
+        });
       };
+
       restore();
       window.requestAnimationFrame(() => {
         restore();
         window.requestAnimationFrame(restore);
       });
+
+      // Android/iOS may resize the visual viewport after keyboard focus.
+      // Re-apply the editor anchor while that keyboard transition settles.
+      [60, 140, 280, 420].forEach((delay) => {
+        window.setTimeout(restore, delay);
+      });
+    };
+
+    const prepareMobileHiddenTextarea = (textTarget: any) => {
+      if (
+        !textTarget.hiddenTextarea &&
+        typeof textTarget.initHiddenTextarea === "function"
+      ) {
+        textTarget.initHiddenTextarea();
+      }
+
+      const textarea =
+        textTarget.hiddenTextarea as HTMLTextAreaElement | undefined;
+
+      if (!textarea) return null;
+
+      Object.assign(textarea.style, {
+        position: "fixed",
+        left: "1px",
+        top: "1px",
+        width: "1px",
+        height: "1px",
+        opacity: "0",
+        padding: "0",
+        margin: "0",
+        border: "0",
+        transform: "none",
+      });
+
+      return textarea;
     };
 
     const handleMobileTextPointerDown = (event: PointerEvent) => {
@@ -1715,6 +1761,8 @@ export default function EditorPage() {
         scroller,
         scrollLeft: scroller?.scrollLeft || 0,
         scrollTop: scroller?.scrollTop || 0,
+        windowX: window.scrollX,
+        windowY: window.scrollY,
       };
     };
 
@@ -1755,17 +1803,31 @@ export default function EditorPage() {
         restoreMobileEditorScroll(
           start.scroller,
           start.scrollLeft,
-          start.scrollTop
+          start.scrollTop,
+          start.windowX,
+          start.windowY
         );
         return;
       }
 
       // A later tap on the already-selected same text enters text editing.
+      // Prepare Fabric's hidden textarea BEFORE enterEditing() so the browser
+      // never gets a chance to scroll the editor toward an off-screen input.
       if (typeof textTarget.enterEditing !== "function") return;
+
+      const preparedTextarea = prepareMobileHiddenTextarea(textTarget);
 
       if (!textTarget.isEditing) {
         textTarget.enterEditing();
       }
+
+      restoreMobileEditorScroll(
+        start.scroller,
+        start.scrollLeft,
+        start.scrollTop,
+        start.windowX,
+        start.windowY
+      );
 
       textEditingRef.current = true;
       setTextEditing(true);
@@ -1773,18 +1835,11 @@ export default function EditorPage() {
       c.requestRenderAll();
 
       const stabilizeFocus = () => {
-        const textarea = textTarget.hiddenTextarea as HTMLTextAreaElement | undefined;
+        const textarea =
+          preparedTextarea ||
+          prepareMobileHiddenTextarea(textTarget);
+
         if (textarea) {
-          Object.assign(textarea.style, {
-            position: "fixed",
-            left: "50%",
-            top: "50%",
-            width: "1px",
-            height: "1px",
-            opacity: "0",
-            padding: "0",
-            margin: "0",
-          });
           try {
             textarea.focus({ preventScroll: true });
           } catch {
@@ -1795,7 +1850,9 @@ export default function EditorPage() {
         restoreMobileEditorScroll(
           start.scroller,
           start.scrollLeft,
-          start.scrollTop
+          start.scrollTop,
+          start.windowX,
+          start.windowY
         );
       };
 
@@ -1804,6 +1861,17 @@ export default function EditorPage() {
         stabilizeFocus();
         window.requestAnimationFrame(stabilizeFocus);
       });
+
+      const viewport = window.visualViewport;
+      const handleViewportChange = () => stabilizeFocus();
+      viewport?.addEventListener("resize", handleViewportChange);
+      viewport?.addEventListener("scroll", handleViewportChange);
+
+      window.setTimeout(() => {
+        viewport?.removeEventListener("resize", handleViewportChange);
+        viewport?.removeEventListener("scroll", handleViewportChange);
+        stabilizeFocus();
+      }, 700);
     };
 
     upperCanvas.addEventListener("pointerdown", handleMobileTextPointerDown);
