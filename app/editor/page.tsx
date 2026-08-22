@@ -22,6 +22,18 @@ import {
 BaseFabricObject.ownDefaults.originX = "left";
 BaseFabricObject.ownDefaults.originY = "top";
 
+// High-contrast selection visuals stay readable on desktop and touch screens.
+Object.assign(BaseFabricObject.ownDefaults as any, {
+  borderColor: "#7c3aed",
+  cornerColor: "#ffffff",
+  cornerStrokeColor: "#7c3aed",
+  cornerStyle: "circle",
+  transparentCorners: false,
+  borderScaleFactor: 2,
+  cornerSize: 12,
+  touchCornerSize: 30,
+});
+
 const fabricCustomProperties = [
   "isMockup",
   "mockupId",
@@ -239,6 +251,13 @@ export default function EditorPage() {
   const pagesRef = useRef<DesignPage[]>([]);
   const activePageIndexRef = useRef(0);
   const textEditingRef = useRef(false);
+  const selectedPinchRef = useRef<{
+    object: FabricObject;
+    scaleX: number;
+    scaleY: number;
+    center: any;
+    changed: boolean;
+  } | null>(null);
   const textEditAnchorRef = useRef(new WeakMap<object, { x: number; y: number }>());
 
   const [cropMode, setCropMode] = useState(false);
@@ -254,6 +273,7 @@ export default function EditorPage() {
   const [format, setFormat] = useState<Format>(FORMATS[0]);
   const [background, setBackground] = useState("#ffffff");
   const [selected, setSelected] = useState<SelectedSnapshot | null>(null);
+  const [textEditing, setTextEditing] = useState(false);
   const [objects, setObjects] = useState<FabricObject[]>([]);
   const [zoom, setZoom] = useState(57);
   const [saved, setSaved] = useState(false);
@@ -990,6 +1010,26 @@ export default function EditorPage() {
     };
   };
 
+  const applySelectionVisuals = (obj: any) => {
+    if (!obj || isCanvasBackgroundImage(obj)) return;
+
+    obj.set({
+      borderColor: "#7c3aed",
+      cornerColor: "#ffffff",
+      cornerStrokeColor: "#7c3aed",
+      cornerStyle: "circle",
+      transparentCorners: false,
+      borderScaleFactor: 2,
+      cornerSize: 12,
+      touchCornerSize: 30,
+      hasBorders: true,
+    } as any);
+
+    if (isLockedObject(obj)) {
+      obj.set({ hasControls: false } as any);
+    }
+  };
+
   const refreshObjects = () => {
     const c = canvas();
     if (!c) return;
@@ -1026,6 +1066,71 @@ export default function EditorPage() {
     refreshObjects();
     setSaved(false);
     setDesignRevision((revision) => revision + 1);
+  };
+
+  const startSelectedPinch = () => {
+    const c = canvas();
+    const object = c?.getActiveObject() as FabricObject | undefined;
+
+    if (
+      !c ||
+      !object ||
+      isCanvasBackgroundImage(object) ||
+      isLockedObject(object) ||
+      Boolean((object as any).isEditing)
+    ) {
+      selectedPinchRef.current = null;
+      return false;
+    }
+
+    applySelectionVisuals(object);
+    selectedPinchRef.current = {
+      object,
+      scaleX: Number(object.scaleX ?? 1),
+      scaleY: Number(object.scaleY ?? 1),
+      center: object.getCenterPoint(),
+      changed: false,
+    };
+    setContextMenu(null);
+    return true;
+  };
+
+  const scaleSelectedPinch = (factor: number) => {
+    const c = canvas();
+    const session = selectedPinchRef.current;
+    if (!c || !session || c.getActiveObject() !== session.object) return;
+
+    const safeFactor = Math.min(8, Math.max(0.12, Number(factor) || 1));
+    const scaleWithSign = (start: number) => {
+      const sign = start < 0 ? -1 : 1;
+      const next = Math.min(20, Math.max(0.03, Math.abs(start) * safeFactor));
+      return sign * next;
+    };
+
+    session.object.set({
+      scaleX: scaleWithSign(session.scaleX),
+      scaleY: scaleWithSign(session.scaleY),
+    } as any);
+    session.object.setPositionByOrigin(session.center, "center", "center");
+    session.object.setCoords();
+    session.changed = true;
+    c.requestRenderAll();
+  };
+
+  const finishSelectedPinch = () => {
+    const c = canvas();
+    const session = selectedPinchRef.current;
+    selectedPinchRef.current = null;
+    if (!c || !session) return;
+
+    session.object.setCoords();
+    applySelectionVisuals(session.object);
+    setSelected(snapshotObject(session.object));
+    c.requestRenderAll();
+
+    if (session.changed) {
+      saveHistory();
+    }
   };
 
   useEffect(() => {
@@ -1155,11 +1260,14 @@ export default function EditorPage() {
       const obj = c.getActiveObject();
       if (isCanvasBackgroundImage(obj)) {
         setSelected(null);
+        setTextEditing(false);
         setBackgroundSelected(true);
         setBackgroundLocked(isBackgroundLocked(obj));
       } else {
         setBackgroundSelected(false);
+        applySelectionVisuals(obj);
         setSelected(snapshotObject(obj));
+        setTextEditing(Boolean((obj as any)?.isEditing));
       }
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setActivePanel(null);
@@ -1168,6 +1276,7 @@ export default function EditorPage() {
 
     const clearSelection = () => {
       setSelected(null);
+      setTextEditing(false);
     };
 
     let selectionFrame: number | null = null;
@@ -1218,6 +1327,8 @@ export default function EditorPage() {
       textEditAnchorRef.current.set(target, topLeft);
       stabilizeTextTopLeft(target, topLeft);
       textEditingRef.current = true;
+      setTextEditing(true);
+      applySelectionVisuals(target);
       setSelected(snapshotObject(target));
       c.requestRenderAll();
     };
@@ -1242,6 +1353,7 @@ export default function EditorPage() {
       }
 
       textEditingRef.current = false;
+      setTextEditing(false);
       if (!cropSessionRef.current) {
         saveHistory();
         setDesignRevision((revision) => revision + 1);
@@ -1520,6 +1632,7 @@ export default function EditorPage() {
       c.setActiveObject(target);
       target.set({ selectable: false });
       target.setCoords();
+      applySelectionVisuals(target);
       setSelected(snapshotObject(target));
       setContextMenu(null);
       c.requestRenderAll();
@@ -1551,6 +1664,150 @@ export default function EditorPage() {
 
     const wrapperEl = c.wrapperEl;
     const upperCanvas = c.upperCanvasEl;
+
+    let mobileTextTapTarget: FabricObject | null = null;
+    let mobileTextPointerStart: {
+      target: FabricObject;
+      x: number;
+      y: number;
+      scroller: HTMLElement | null;
+      scrollLeft: number;
+      scrollTop: number;
+    } | null = null;
+
+    const restoreMobileEditorScroll = (
+      scroller: HTMLElement | null,
+      left: number,
+      top: number
+    ) => {
+      if (!scroller) return;
+      const restore = () => {
+        scroller.scrollLeft = left;
+        scroller.scrollTop = top;
+      };
+      restore();
+      window.requestAnimationFrame(() => {
+        restore();
+        window.requestAnimationFrame(restore);
+      });
+    };
+
+    const handleMobileTextPointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || backgroundEditingRef.current) return;
+
+      const target = (c as any).findTarget?.(event) as FabricObject | undefined;
+      if (
+        !target ||
+        !isEditableText(target) ||
+        isLockedObject(target) ||
+        target.visible === false
+      ) {
+        mobileTextPointerStart = null;
+        mobileTextTapTarget = null;
+        return;
+      }
+
+      const scroller = wrapperEl.closest("section") as HTMLElement | null;
+      mobileTextPointerStart = {
+        target,
+        x: Number(event.clientX || 0),
+        y: Number(event.clientY || 0),
+        scroller,
+        scrollLeft: scroller?.scrollLeft || 0,
+        scrollTop: scroller?.scrollTop || 0,
+      };
+    };
+
+    const handleMobileTextPointerUp = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") return;
+
+      const start = mobileTextPointerStart;
+      mobileTextPointerStart = null;
+      if (!start) return;
+
+      const target = (c as any).findTarget?.(event) as FabricObject | undefined;
+      if (!target || target !== start.target) return;
+
+      const distance = Math.hypot(
+        Number(event.clientX || 0) - start.x,
+        Number(event.clientY || 0) - start.y
+      );
+      if (distance > 12) return;
+
+      const textTarget = target as any;
+      setContextMenu(null);
+      setBackgroundSelected(false);
+      applySelectionVisuals(textTarget);
+
+      // First completed tap: selection only. Never open the keyboard here.
+      if (mobileTextTapTarget !== target) {
+        mobileTextTapTarget = target;
+
+        if (textTarget.isEditing && typeof textTarget.exitEditing === "function") {
+          textTarget.exitEditing();
+        }
+
+        c.setActiveObject(target);
+        target.setCoords();
+        setSelected(snapshotObject(target));
+        setTextEditing(false);
+        c.requestRenderAll();
+        restoreMobileEditorScroll(
+          start.scroller,
+          start.scrollLeft,
+          start.scrollTop
+        );
+        return;
+      }
+
+      // A later tap on the already-selected same text enters text editing.
+      if (typeof textTarget.enterEditing !== "function") return;
+
+      if (!textTarget.isEditing) {
+        textTarget.enterEditing();
+      }
+
+      textEditingRef.current = true;
+      setTextEditing(true);
+      setSelected(snapshotObject(textTarget));
+      c.requestRenderAll();
+
+      const stabilizeFocus = () => {
+        const textarea = textTarget.hiddenTextarea as HTMLTextAreaElement | undefined;
+        if (textarea) {
+          Object.assign(textarea.style, {
+            position: "fixed",
+            left: "50%",
+            top: "50%",
+            width: "1px",
+            height: "1px",
+            opacity: "0",
+            padding: "0",
+            margin: "0",
+          });
+          try {
+            textarea.focus({ preventScroll: true });
+          } catch {
+            textarea.focus();
+          }
+        }
+
+        restoreMobileEditorScroll(
+          start.scroller,
+          start.scrollLeft,
+          start.scrollTop
+        );
+      };
+
+      stabilizeFocus();
+      window.requestAnimationFrame(() => {
+        stabilizeFocus();
+        window.requestAnimationFrame(stabilizeFocus);
+      });
+    };
+
+    upperCanvas.addEventListener("pointerdown", handleMobileTextPointerDown);
+    upperCanvas.addEventListener("pointerup", handleMobileTextPointerUp);
 
     const handleBackgroundTouchPointerUp = (event: PointerEvent) => {
       if (event.pointerType !== "touch" || backgroundEditingRef.current) return;
@@ -1939,6 +2196,8 @@ export default function EditorPage() {
       c.off("object:rotating", updateTransientSelection);
       c.off("object:modified", clearSmartGuides);
       c.off("mouse:up", cropMouseUp);
+      upperCanvas.removeEventListener("pointerdown", handleMobileTextPointerDown);
+      upperCanvas.removeEventListener("pointerup", handleMobileTextPointerUp);
       upperCanvas.removeEventListener("pointerup", handleBackgroundTouchPointerUp);
       if (selectionFrame !== null) {
         window.cancelAnimationFrame(selectionFrame);
@@ -6466,6 +6725,7 @@ export default function EditorPage() {
         <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
           <ContextToolbar
             selected={backgroundSelected || backgroundEditing || selectedLocked ? null : selected}
+            textEditing={textEditing}
             onUpdate={updateSelected}
             onDuplicate={() => void duplicateSelected()}
             onDelete={deleteSelected}
@@ -6526,7 +6786,7 @@ export default function EditorPage() {
             onDeletePage={deleteDesignPageAt}
             onTogglePageHidden={toggleDesignPageHidden}
             selected={selected}
-            quickActionsEnabled={!cropMode && !contextMenu && !backgroundSelected && !backgroundEditing}
+            quickActionsEnabled={!cropMode && !contextMenu && !backgroundSelected && !backgroundEditing && !textEditing}
             backgroundSelected={backgroundSelected}
             backgroundEditing={backgroundEditing}
             backgroundLocked={backgroundLocked}
@@ -6551,6 +6811,9 @@ export default function EditorPage() {
             onOpenSelectedMore={(position) => {
               setContextMenu(position);
             }}
+            onSelectedPinchStart={startSelectedPinch}
+            onSelectedPinchScale={scaleSelectedPinch}
+            onSelectedPinchEnd={finishSelectedPinch}
             onDeselect={deselectCanvasObject}
           />
         </div>

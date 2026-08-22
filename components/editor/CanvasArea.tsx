@@ -42,6 +42,9 @@ type Props = {
   onDeleteSelected: () => void;
   onUnlockSelected: () => void;
   onOpenSelectedMore: (position: { x: number; y: number }) => void;
+  onSelectedPinchStart: () => boolean;
+  onSelectedPinchScale: (factor: number) => void;
+  onSelectedPinchEnd: () => void;
   onDeselect: () => void;
 };
 
@@ -188,7 +191,57 @@ export default function CanvasArea(props: Props) {
     height: number;
   } | null>(null);
   const [backgroundMoreOpen, setBackgroundMoreOpen] = useState(false);
-  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const [objectPinching, setObjectPinching] = useState(false);
+  const pinchRef = useRef<{
+    distance: number;
+    zoom: number;
+    mode: "canvas" | "object";
+  } | null>(null);
+  const controlTouchRef = useRef<{
+    x: number;
+    y: number;
+    target: HTMLElement | null;
+  } | null>(null);
+
+  const beginControlTouch = (event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length !== 1) {
+      controlTouchRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    const target = (event.target as HTMLElement).closest<HTMLElement>(
+      'button, label'
+    );
+    controlTouchRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      target,
+    };
+    event.stopPropagation();
+  };
+
+  const finishControlTouch = (event: TouchEvent<HTMLElement>) => {
+    const start = controlTouchRef.current;
+    controlTouchRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || !start.target) return;
+
+    const distance = Math.hypot(
+      touch.clientX - start.x,
+      touch.clientY - start.y
+    );
+    if (distance > 12) return;
+
+    const endTarget = (event.target as HTMLElement).closest<HTMLElement>(
+      'button, label'
+    );
+    if (endTarget !== start.target) return;
+
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    start.target.click();
+  };
 
   const getTouchDistance = (event: TouchEvent<HTMLElement>) => {
     const first = event.touches[0];
@@ -197,11 +250,67 @@ export default function CanvasArea(props: Props) {
     return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
   };
 
+  const touchesInsideSelectedObject = (event: TouchEvent<HTMLElement>) => {
+    const selected = props.selected;
+    if (
+      !selected ||
+      selected.selectable === false ||
+      props.backgroundSelected ||
+      props.backgroundEditing ||
+      event.touches.length !== 2
+    ) {
+      return false;
+    }
+
+    const activeCanvas = sectionRef.current?.querySelector<HTMLElement>(
+      '[data-kriyavo-active-canvas="true"]'
+    );
+    if (!activeCanvas) return false;
+
+    const canvasRect = activeCanvas.getBoundingClientRect();
+    const left = canvasRect.left + Number(selected.left ?? 0) * scale;
+    const top = canvasRect.top + Number(selected.top ?? 0) * scale;
+    const width = Math.max(1, Number(selected.width ?? 1) * scale);
+    const height = Math.max(1, Number(selected.height ?? 1) * scale);
+    const padding = 26;
+
+    return Array.from(event.touches).every(
+      (touch) =>
+        touch.clientX >= left - padding &&
+        touch.clientX <= left + width + padding &&
+        touch.clientY >= top - padding &&
+        touch.clientY <= top + height + padding
+    );
+  };
+
   const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
     if (event.touches.length !== 2) return;
     const distance = getTouchDistance(event);
     if (!distance) return;
-    pinchRef.current = { distance, zoom: props.zoom };
+
+    if (touchesInsideSelectedObject(event)) {
+      const started = props.onSelectedPinchStart();
+      if (!started) {
+        pinchRef.current = null;
+        if (event.cancelable) event.preventDefault();
+        return;
+      }
+
+      pinchRef.current = {
+        distance,
+        zoom: props.zoom,
+        mode: "object",
+      };
+      setObjectPinching(true);
+      if (event.cancelable) event.preventDefault();
+      return;
+    }
+
+    pinchRef.current = {
+      distance,
+      zoom: props.zoom,
+      mode: "canvas",
+    };
     if (event.cancelable) event.preventDefault();
   };
 
@@ -209,15 +318,35 @@ export default function CanvasArea(props: Props) {
     if (event.touches.length !== 2 || !pinchRef.current) return;
     const distance = getTouchDistance(event);
     if (!distance) return;
+
+    if (pinchRef.current.mode === "object") {
+      const factor = distance / Math.max(1, pinchRef.current.distance);
+      props.onSelectedPinchScale(factor);
+      if (event.cancelable) event.preventDefault();
+      return;
+    }
+
     const nextZoom = Math.round(
-      Math.min(180, Math.max(18, pinchRef.current.zoom * (distance / pinchRef.current.distance)))
+      Math.min(
+        180,
+        Math.max(
+          18,
+          pinchRef.current.zoom * (distance / pinchRef.current.distance)
+        )
+      )
     );
     props.onZoomChange(nextZoom);
     if (event.cancelable) event.preventDefault();
   };
 
   const handleTouchEnd = (event: TouchEvent<HTMLElement>) => {
-    if (event.touches.length < 2) pinchRef.current = null;
+    if (event.touches.length >= 2) return;
+
+    if (pinchRef.current?.mode === "object") {
+      props.onSelectedPinchEnd();
+      setObjectPinching(false);
+    }
+    pinchRef.current = null;
   };
 
   const displayWidth = Math.max(1, Math.round(editorSize.width * scale));
@@ -236,7 +365,7 @@ export default function CanvasArea(props: Props) {
 
   const quickActionPosition = useMemo(() => {
     const selection = props.selected;
-    if (!selection || !props.quickActionsEnabled) return null;
+    if (!selection || !props.quickActionsEnabled || objectPinching) return null;
 
     const left = Number(selection.left ?? 0);
     const top = Number(selection.top ?? 0);
@@ -261,6 +390,7 @@ export default function CanvasArea(props: Props) {
   }, [
     props.selected,
     props.quickActionsEnabled,
+    objectPinching,
     scale,
     displayWidth,
   ]);
@@ -568,11 +698,13 @@ export default function CanvasArea(props: Props) {
                 {!props.backgroundEditing ? (
                   <div
                     data-kriyavo-canvas-interactive="true"
-                    className="pointer-events-auto absolute left-1/2 z-[68] flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
+                    className="pointer-events-auto absolute left-1/2 z-[68] flex -translate-x-1/2 items-center gap-1 rounded-2xl touch-manipulation border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
                     style={{ top: activeCanvasTop + 10 }}
                     role="toolbar"
                     aria-label={props.backgroundLocked ? "Background locked" : "Background image quick actions"}
                     onPointerDown={(event) => event.stopPropagation()}
+                    onTouchStartCapture={beginControlTouch}
+                    onTouchEndCapture={finishControlTouch}
                   >
                     {props.backgroundLocked ? (
                       <button
@@ -630,6 +762,8 @@ export default function CanvasArea(props: Props) {
                     role="toolbar"
                     aria-label="Background crop and zoom"
                     onPointerDown={(event) => event.stopPropagation()}
+                    onTouchStartCapture={beginControlTouch}
+                    onTouchEndCapture={finishControlTouch}
                   >
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -662,6 +796,8 @@ export default function CanvasArea(props: Props) {
                       className="pointer-events-auto absolute left-1/2 z-[190] hidden w-72 -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl md:block"
                       style={{ top: activeCanvasTop + 58 }}
                       onPointerDown={(event) => event.stopPropagation()}
+                      onTouchStartCapture={beginControlTouch}
+                      onTouchEndCapture={finishControlTouch}
                     >
                       <div className="flex items-start justify-between gap-3 px-3 py-2">
                         <div>
@@ -733,8 +869,10 @@ export default function CanvasArea(props: Props) {
 
                     <div
                       data-kriyavo-canvas-interactive="true"
-                      className="pointer-events-auto fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[210] max-h-[70dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl md:hidden"
+                      className="pointer-events-auto fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[210] max-h-[70dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl md:hidden touch-manipulation"
                       onPointerDown={(event) => event.stopPropagation()}
+                      onTouchStartCapture={beginControlTouch}
+                      onTouchEndCapture={finishControlTouch}
                     >
                       <div className="mx-auto mt-1 h-1 w-10 rounded-full bg-slate-300" />
                       <div className="flex items-center justify-between px-3 py-3">
@@ -823,7 +961,7 @@ export default function CanvasArea(props: Props) {
             {quickActionPosition && (
               <div
                 data-kriyavo-canvas-interactive="true"
-                className="pointer-events-auto absolute z-[65] flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
+                className="pointer-events-auto absolute z-[65] flex -translate-x-1/2 items-center gap-1 rounded-2xl touch-manipulation border border-slate-200 bg-white/95 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur"
                 style={{
                   left: quickActionPosition.left,
                   top: quickActionPosition.top,
@@ -831,6 +969,8 @@ export default function CanvasArea(props: Props) {
                 role="toolbar"
                 aria-label={props.selected?.selectable === false ? "Selected object locked" : "Selected object quick actions"}
                 onPointerDown={(event) => event.stopPropagation()}
+                onTouchStartCapture={beginControlTouch}
+                onTouchEndCapture={finishControlTouch}
               >
                 {props.selected?.selectable === false ? (
                   <button

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FONTS } from "@/lib/editor/fonts";
 import type { EditorPanel, SelectedSnapshot } from "@/types/editor";
 
 type Props = {
   selected: SelectedSnapshot | null;
+  textEditing: boolean;
   onUpdate: (changes: any) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -75,11 +76,17 @@ export default function ContextToolbar(props: Props) {
   const selected = props.selected;
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [desktopCornersOpen, setDesktopCornersOpen] = useState(false);
+  const selectedType = String(selected?.type || "").toLowerCase();
+  const selectedIsText = ["textbox", "text", "i-text", "itext"].includes(selectedType);
+
+  useEffect(() => {
+    setMobileSheet(null);
+  }, [selectedType, props.textEditing]);
 
   if (!selected) return null;
 
-  const type = selected.type.toLowerCase();
-  const isText = ["textbox", "text", "i-text", "itext"].includes(type);
+  const type = selectedType;
+  const isText = selectedIsText;
   const isImage = ["image", "fabricimage"].includes(type);
   const isMockup = Boolean(selected.isMockup);
   const isSmartFrame = Boolean(selected.isSmartFrame);
@@ -399,7 +406,9 @@ export default function ContextToolbar(props: Props) {
 
   return (
     <>
-      {/* Mobile: the contextual toolbar replaces the normal footer bar. */}
+      {/* Mobile text tools appear only after the selected text enters edit mode.
+          First tap stays selection-only with the floating quick actions. */}
+      {(!isText || props.textEditing) && (
       <div className="fixed inset-x-0 bottom-0 z-[82] border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_22px_rgba(15,23,42,0.10)] md:hidden">
         {renderMobileSheet()}
         <div className="flex h-[58px] items-center overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -470,6 +479,7 @@ export default function ContextToolbar(props: Props) {
           )}
         </div>
       </div>
+      )}
 
       {/* Desktop: preserve the full existing toolbar, just compact the visual scale. */}
       <div className="pointer-events-none absolute left-1/2 top-3 z-40 hidden w-auto -translate-x-1/2 px-3 md:block">

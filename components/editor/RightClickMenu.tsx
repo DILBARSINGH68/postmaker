@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type TouchEvent } from "react";
 
 type Props = {
   x: number;
@@ -75,6 +75,47 @@ function MenuButton({
 export default function RightClickMenu(props: Props) {
   const [submenu, setSubmenu] = useState<"layer" | "align" | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const touchActionRef = useRef<{
+    x: number;
+    y: number;
+    target: HTMLElement | null;
+  } | null>(null);
+
+  const beginTouchAction = (event: TouchEvent<HTMLDivElement>) => {
+    if (!isMobile || event.touches.length !== 1) {
+      touchActionRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    touchActionRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      target: (event.target as HTMLElement).closest<HTMLElement>(
+        'button, label'
+      ),
+    };
+    event.stopPropagation();
+  };
+
+  const finishTouchAction = (event: TouchEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    const start = touchActionRef.current;
+    touchActionRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || !start.target) return;
+    const distance = Math.hypot(
+      touch.clientX - start.x,
+      touch.clientY - start.y
+    );
+    if (distance > 12) return;
+    const endTarget = (event.target as HTMLElement).closest<HTMLElement>(
+      'button, label'
+    );
+    if (endTarget !== start.target) return;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    start.target.click();
+  };
 
   useEffect(() => {
     const syncViewport = () => setIsMobile(window.innerWidth < 768);
@@ -113,7 +154,7 @@ export default function RightClickMenu(props: Props) {
       data-postmaker-context-menu
       className={
         isMobile
-          ? "fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[200] max-h-[72dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl"
+          ? "fixed inset-x-2 bottom-[calc(66px_+_env(safe-area-inset-bottom))] z-[200] max-h-[72dvh] overflow-y-auto rounded-[24px] border bg-white p-2 pb-4 shadow-2xl touch-manipulation"
           : "fixed z-[200] w-72 max-h-[min(610px,calc(100vh-24px))] overflow-y-auto rounded-2xl border bg-white p-2 shadow-2xl"
       }
       style={
@@ -125,6 +166,8 @@ export default function RightClickMenu(props: Props) {
             }
       }
       onContextMenu={(e) => e.preventDefault()}
+      onTouchStartCapture={beginTouchAction}
+      onTouchEndCapture={finishTouchAction}
     >
       {isMobile && (
         <div className="sticky top-0 z-10 mb-1 bg-white pb-1">
